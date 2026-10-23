@@ -35,16 +35,20 @@ public sealed class LandingScoreView : FrameworkElement
 
     internal LandingScore? Score => _score;
 
+    /// <summary>A later contact of a bounced landing: recorded as a bounce and not scored.</summary>
+    internal bool IsBounceContact => _record is { ContactNumber: > 1 };
+
     public void SetRecord(LandingRecord? record, IEnumerable<LandingRecord>? contacts = null)
     {
         _record = record;
         _score = null;
         _distance = null;
-        if (record != null)
+        if (record != null && !IsBounceContact)
         {
             var prepared = ReplayPresentationData.Prepare(record, contacts ?? Array.Empty<LandingRecord>());
             _distance = LandingDistanceAnalysis.Create(record, prepared.Track, prepared.ContactTimes);
-            _score = LandingScore.Create(record, prepared.Track, _distance);
+            _score = LandingScore.Create(record, prepared.Track, _distance,
+                LandingReplayContacts.ForEpisode(record, contacts ?? Array.Empty<LandingRecord>()));
         }
         Invalidate();
     }
@@ -73,6 +77,13 @@ public sealed class LandingScoreView : FrameworkElement
         context.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
         var record = _record;
         var score = _score;
+        if (record != null && IsBounceContact)
+        {
+            var message = Formatted(Format("Score.BounceContactFormat", record.ContactNumber, record.ContactCount), MutedBrush, 12);
+            message.MaxTextWidth = Math.Max(1, ActualWidth - 2 * SummaryLeft);
+            context.DrawText(message, new Point(SummaryLeft, 18));
+            return;
+        }
         if (record == null || score == null) return;
         if (ActualWidth < 640 || ActualHeight < 220 || score.Total is not double total)
         {
@@ -106,8 +117,14 @@ public sealed class LandingScoreView : FrameworkElement
         var available = score.Components.Count(component => component.Score.HasValue);
         y = DrawWrapped(context, Format("Score.CriteriaFormat", available, score.Components.Count, score.AvailableWeight),
             available == score.Components.Count ? MutedBrush : AmberBrush, 11, y) + 6;
+        if (score.BounceDeduction > 0)
+            y = DrawWrapped(context, Format("Score.BounceDeductedFormat", score.BounceCount, score.BounceDeduction), AmberBrush, 11, y) + 6;
+        if (score.Capped && score.LimitingScore is double limitingScore && score.Weakest is { } weakest)
+            y = DrawWrapped(context, Format("Score.CappedFormat",
+                Text("Score.Criterion." + (score.LimitedByBounce ? "Bounce" : weakest.Criterion.ToString())), limitingScore,
+                LandingScore.WeakestCriterionMargin, score.UncappedTotal!.Value), AmberBrush, 11, y) + 6;
         if (record.ContactCount > 1)
-            y = DrawWrapped(context, Format("Score.ContactFormat", record.ContactNumber, record.ContactCount), AmberBrush, 11, y) + 6;
+            y = DrawWrapped(context, Format("Score.ContactFormat", record.ContactCount), AmberBrush, 11, y) + 6;
         DrawWrapped(context, Text("Score.Basis"), SubtleBrush, 10, y + 6);
         context.DrawLine(GridPen, new Point(RowsLeft - 18, 4), new Point(RowsLeft - 18, ActualHeight - 8));
     }
@@ -128,41 +145,55 @@ public sealed class LandingScoreView : FrameworkElement
         var pointsHeader = Formatted(Text("Score.HeaderPoints"), SubtleBrush, 9, FontWeights.SemiBold);
         context.DrawText(pointsHeader, new Point(right - pointsHeader.Width, 4));
 
-        var rowHeight = Math.Max(40, Math.Min(66, (ActualHeight - HeaderHeight - 6) / score.Components.Count));
-        for (var index = 0; index < score.Components.Count; index++)
+        var rows = score.Components.Select(component => (
+            Name: Text("Score.Criterion." + component.Criterion), Rule: Rule(component), Measured: Measured(component, record, score),
+            component.Score,
+            Points: component.Points is double earned
+                ? Format("Score.PointsFormat", earned, component.Weight)
+                : Format("Score.PointsUnavailableFormat", component.Weight),
+            Bar: true)).ToList();
+        // The bounce has no weight: it deducts from the total and takes part in the cap.
+        var curve = LandingScore.BounceScoreCurve;
+        rows.Add((Text("Score.Criterion.Bounce"),
+            Format("Score.Rule.BounceFormat", curve[0].Score, curve[1].Score, curve[1].X, curve[2].Score, curve[2].X),
+            score.BounceCount == 0 ? Text("Score.BounceNone") : Format("Score.BounceMeasuredFormat", string.Join(" / ",
+                score.BounceHeightsFeet.Select(height => height is double feet ? feet.ToString("0.0#", CultureInfo.CurrentCulture) : Text("Score.NotAvailable")))),
+            score.BounceScore, Format("Score.DeductionFormat", score.BounceDeduction), true));
+
+        var rowHeight = Math.Max(40, Math.Min(66, (ActualHeight - HeaderHeight - 6) / rows.Count));
+        for (var index = 0; index < rows.Count; index++)
         {
-            var component = score.Components[index];
+            var row = rows[index];
             var top = HeaderHeight + index * rowHeight;
             context.DrawLine(GridPen, new Point(RowsLeft, top), new Point(right, top));
             var middle = top + rowHeight / 2;
-            var name = Trimmed(Formatted(Text("Score.Criterion." + component.Criterion), TextBrush, 12, FontWeights.SemiBold), nameWidth);
-            var rule = Trimmed(Formatted(Rule(component), SubtleBrush, 10), nameWidth);
+            var name = Trimmed(Formatted(row.Name, TextBrush, 12, FontWeights.SemiBold), nameWidth);
+            var rule = Trimmed(Formatted(row.Rule, SubtleBrush, 10), nameWidth);
             var block = name.Height + 2 + rule.Height;
             context.DrawText(name, new Point(RowsLeft, middle - block / 2));
             context.DrawText(rule, new Point(RowsLeft, middle - block / 2 + name.Height + 2));
 
-            var brush = component.Score is double value ? ScoreBrush(value) : SubtleBrush;
-            var measured = Trimmed(FormattedMono(Measured(component, record, score), component.Score.HasValue ? TextBrush : SubtleBrush, 14), valueWidth);
+            var brush = row.Score is double value ? ScoreBrush(value) : SubtleBrush;
+            var valueBrush = row.Score.HasValue || !row.Bar ? TextBrush : SubtleBrush;
+            var measured = Trimmed(FormattedMono(row.Measured, valueBrush, 14), valueWidth);
             context.DrawText(measured, new Point(valueLeft, middle - measured.Height / 2));
 
-            if (barRight - barLeft > 40)
+            if (row.Bar && barRight - barLeft > 40)
             {
                 var bar = new Rect(barLeft, middle - 4, barRight - barLeft, 8);
                 context.DrawRoundedRectangle(TrackBrush, null, bar, 4, 4);
                 foreach (var tick in new[] { .5, .75 })
                     context.DrawLine(TickPen, new Point(bar.Left + bar.Width * tick, bar.Top - 3), new Point(bar.Left + bar.Width * tick, bar.Bottom + 3));
-                if (component.Score is double scored && scored > 0)
+                if (row.Score is double scored && scored > 0)
                     context.DrawRoundedRectangle(brush, null, new Rect(bar.Left, bar.Top, Math.Max(8, bar.Width * scored / 100), bar.Height), 4, 4);
-                var label = FormattedMono(component.Score is double shown ? shown.ToString("0", CultureInfo.CurrentCulture) : Text("Score.NotAvailable"), brush, 10);
+                var label = FormattedMono(row.Score is double shown ? shown.ToString("0", CultureInfo.CurrentCulture) : Text("Score.NotAvailable"), brush, 10);
                 context.DrawText(label, new Point(bar.Right + 6, middle - label.Height / 2));
             }
 
-            var points = FormattedMono(component.Points is double earned
-                ? Format("Score.PointsFormat", earned, component.Weight)
-                : Format("Score.PointsUnavailableFormat", component.Weight), component.Score.HasValue ? TextBrush : SubtleBrush, 13);
+            var points = FormattedMono(row.Points, valueBrush, 13);
             context.DrawText(points, new Point(right - points.Width, middle - points.Height / 2));
         }
-        var bottom = HeaderHeight + score.Components.Count * rowHeight;
+        var bottom = HeaderHeight + rows.Count * rowHeight;
         context.DrawLine(GridPen, new Point(RowsLeft, bottom), new Point(right, bottom));
     }
 
@@ -197,13 +228,13 @@ public sealed class LandingScoreView : FrameworkElement
                 component.Criterion == LandingScoreCriterion.GForce ? "Score.NeedsImpact" : "Score.NotAvailable");
         return component.Criterion switch
         {
-            LandingScoreCriterion.VerticalSpeed => Format("Score.Rule.VerticalSpeedFormat", curve[1].X, curve[2].X, curve[3].X),
-            LandingScoreCriterion.GForce => Format("Score.Rule.GForceFormat", curve[1].X, curve[2].X, curve[3].X),
-            LandingScoreCriterion.TouchdownZone => Format("Score.Rule.TouchdownZoneFormat", curve[1].X, curve[2].X, curve[4].X),
-            LandingScoreCriterion.Centerline => Format("Score.Rule.CenterlineFormat", curve[1].X, curve[curve.Count - 1].X),
-            LandingScoreCriterion.Crab => Format("Score.Rule.AngleFormat", curve[1].X, curve[curve.Count - 1].X),
-            LandingScoreCriterion.Bank => Format("Score.Rule.AngleFormat", curve[1].X, curve[curve.Count - 1].X),
-            _ => Format("Score.Rule.PitchFormat", curve[2].X, curve[3].X, curve[0].X, curve[curve.Count - 1].X),
+            LandingScoreCriterion.VerticalSpeed => Format("Score.Rule.VerticalSpeedFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.GForce => Format("Score.Rule.GForceFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.TouchdownZone => Format("Score.Rule.TouchdownZoneFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.Centerline => Format("Score.Rule.CenterlineFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.Crab => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.Bank => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            _ => Format("Score.Rule.PitchFormat", curve[3].X, curve[4].X, curve[2].X, curve[5].X),
         };
     }
 
@@ -211,6 +242,8 @@ public sealed class LandingScoreView : FrameworkElement
         total >= 90 ? "Excellent" : total >= 80 ? "Good" : total >= 65 ? "Fair" : total >= 50 ? "Poor" : "Bad";
 
     internal static Brush ScoreBrush(double score) => score >= 80 ? GreenBrush : score >= 60 ? AmberBrush : DangerBrush;
+
+    internal static Brush BounceBrush => AmberBrush;
 
     private double DrawWrapped(DrawingContext context, string text, Brush brush, double size, double y)
     {

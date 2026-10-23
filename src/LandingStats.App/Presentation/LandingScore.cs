@@ -28,8 +28,10 @@ internal sealed class LandingScoreComponent
 
 /// <summary>
 /// A transparent touchdown rating. Component weights follow TouchdownFX's
-/// published split; every threshold is this application's own and is exposed
-/// with the result. Scores the selected contact only.
+/// published split. Each curve scores 100 within normal operation, 60 at the
+/// first published flag level or SOP go-around limit, 20 at the severe level
+/// and 0 at a structural or geometric limit; thresholds without a published
+/// source are marked as this application's own. Scores the selected contact only.
 /// </summary>
 internal sealed class LandingScore
 {
@@ -37,7 +39,26 @@ internal sealed class LandingScore
     internal const double RegionalMaximumPounds = 100000;
     internal const double HeavyMinimumPounds = 300000;
     internal const double TouchdownZoneOverrunMeters = 300;
+    internal const double TouchdownZoneSevereMeters = 150;
     internal const double CrabSampleSeconds = 0.5;
+    /// <summary>The total may exceed the weakest criterion by at most this many points.</summary>
+    internal const double WeakestCriterionMargin = 25;
+    /// <summary>FSF ALAR Briefing Note 6.4 continues the landing after a bounce up to about 5 ft and goes around above it.</summary>
+    internal const double HighBounceFeet = 5;
+    /// <summary>
+    /// Bounce score over the highest bounce in feet. Any later contact is an FDM bounced-landing
+    /// event (EASA RE30), so even a skip scores below 100; a light bounce at the 5 ft limit sits at
+    /// the first flag (60) and a high bounce at the severe level (20). The skip score and the
+    /// 1 ft ramp are this application's own.
+    /// </summary>
+    internal static readonly (double X, double Score)[] BounceScoreCurve =
+        { (0, 92), (HighBounceFeet, 60), (HighBounceFeet + 1, 20) };
+    /// <summary>Scored when the stored series does not reach the bounce: the light-bounce limit.</summary>
+    internal const double UnmeasuredBounceScore = 60;
+    /// <summary>A bounce deducts as if it were a criterion carrying this many extra points.</summary>
+    internal const double BounceWeight = 25;
+    /// <summary>Contacts no more than this far apart belong to one landing episode.</summary>
+    internal const double MaximumBounceSeconds = 10;
     private static readonly IReadOnlyDictionary<LandingScoreCriterion, double> Weights = new Dictionary<LandingScoreCriterion, double>
     {
         [LandingScoreCriterion.VerticalSpeed] = 30, [LandingScoreCriterion.GForce] = 15, [LandingScoreCriterion.TouchdownZone] = 15,
@@ -52,11 +73,40 @@ internal sealed class LandingScore
     public IReadOnlyList<LandingScoreComponent> Components { get; private set; } = Array.Empty<LandingScoreComponent>();
     public double AvailableWeight => Components.Where(component => component.Score.HasValue).Sum(component => component.Weight);
     /// <summary>Points over the available weights, normalised to 0–100; null without any measurement.</summary>
-    public double? Total => AvailableWeight <= 0 ? null : Components.Sum(component => component.Points ?? 0) / AvailableWeight * 100;
+    public double? WeightedTotal => AvailableWeight <= 0 ? null : Components.Sum(component => component.Points ?? 0) / AvailableWeight * 100;
+    /// <summary>Lowest-scoring available criterion; the first in order on a tie.</summary>
+    public LandingScoreComponent? Weakest => Components.Where(component => component.Score.HasValue).OrderBy(component => component.Score).FirstOrDefault();
+    /// <summary>Height of each bounce, in order; null where the stored series cannot measure it.</summary>
+    public IReadOnlyList<double?> BounceHeightsFeet { get; private set; } = Array.Empty<double?>();
+    /// <summary>Later contacts of the same landing; each one ends a bounce after the scored first contact.</summary>
+    public int BounceCount => BounceHeightsFeet.Count;
+    /// <summary>Each bounce scored on <see cref="BounceScoreCurve"/>, or at the light-bounce limit when unmeasured.</summary>
+    public IEnumerable<double> BounceScores => BounceHeightsFeet.Select(height =>
+        height is double measured ? Evaluate(BounceScoreCurve, measured) : UnmeasuredBounceScore);
+    /// <summary>100 less the shortfall of every bounce, so each bounce counts separately; not below zero.</summary>
+    public double BounceScore => Math.Max(0, 100 - BounceScores.Sum(score => 100 - score));
+    public double BounceDeduction => (100 - BounceScore) * BounceWeight / 100;
+    /// <summary>Weighted total less the bounce deduction, before any cap.</summary>
+    public double? UncappedTotal => WeightedTotal - BounceDeduction;
+    /// <summary>Weighted total capped at the weakest criterion plus <see cref="WeakestCriterionMargin"/>.</summary>
+    private double? CriteriaTotal => WeightedTotal is double weighted && Weakest?.Score is double weakest
+        ? Math.Min(weighted, weakest + WeakestCriterionMargin) : null;
+    /// <summary>
+    /// The capped criteria total less the bounce deduction, so a bounce always costs points,
+    /// and at most the bounce score plus <see cref="WeakestCriterionMargin"/>.
+    /// </summary>
+    public double? Total => CriteriaTotal is double criteria
+        ? Math.Max(0, Math.Min(criteria - BounceDeduction, BounceScore + WeakestCriterionMargin)) : null;
+    public bool Capped => UncappedTotal is double uncapped && Total is double total && total < uncapped;
+    /// <summary>True when the bounce, not a weighted criterion, sets the cap.</summary>
+    public bool LimitedByBounce => CriteriaTotal is double criteria && BounceScore + WeakestCriterionMargin < criteria - BounceDeduction;
+    public double? LimitingScore => LimitedByBounce ? BounceScore : Weakest?.Score;
     /// <summary>Signed crab for display: positive when the nose points right of the ground track.</summary>
     public double? CrabSignedDegrees { get; private set; }
 
-    public static LandingScore Create(LandingRecord record, LandingReplayTrack? track, LandingDistanceAnalysis? distance)
+    /// <param name="episode">Other contacts of the same landing, used to measure the bounces they end.</param>
+    public static LandingScore Create(LandingRecord record, LandingReplayTrack? track, LandingDistanceAnalysis? distance,
+        IEnumerable<LandingRecord>? episode = null)
     {
         var result = new LandingScore();
         result.ResolveCategory(record);
@@ -89,56 +139,149 @@ internal sealed class LandingScore
         // MSFS reports nose-up pitch as negative.
         Add(LandingScoreCriterion.Pitch, Finite(record.PitchDegrees) ? -record.PitchDegrees : null, PitchCurve(result.Category));
         result.Components = components;
+        result.BounceHeightsFeet = BounceHeights(record, episode ?? Array.Empty<LandingRecord>());
         return result;
     }
 
-    internal static (double X, double Score)[] VerticalSpeedCurve(LandingScoreCategory category)
+    /// <summary>
+    /// Each bounce is measured on the contact that ends it, whose series holds the airborne
+    /// stretch just before it, and otherwise on the matching airborne stretch after the first contact.
+    /// </summary>
+    private static IReadOnlyList<double?> BounceHeights(LandingRecord first, IEnumerable<LandingRecord> episode)
     {
-        // FAR 25.473 designs transport landing gear for 10 ft/s (600 fpm) at
-        // design landing weight; lighter categories are expected to land softer.
-        var (full, good, zero) = category switch
+        var contacts = episode.Where(contact => contact.ContactNumber > 1 && contact.ContactNumber <= first.ContactCount)
+            .GroupBy(contact => contact.ContactNumber).ToDictionary(group => group.Key, group => group.First());
+        var afterFirst = HeightsAfterContact(first);
+        var heights = new double?[Math.Max(0, first.ContactCount - 1)];
+        for (var index = 0; index < heights.Length; index++)
         {
-            LandingScoreCategory.Light => (100.0, 200.0, 500.0),
-            LandingScoreCategory.Regional => (150.0, 300.0, 600.0),
-            LandingScoreCategory.Heavy => (220.0, 400.0, 600.0),
-            _ => (180.0, 360.0, 600.0),
-        };
-        return new[] { (0.0, 100.0), (full, 100.0), (good, 75.0), (zero, 0.0) };
+            var previous = index == 0 ? first : contacts.TryGetValue(index + 1, out var before) ? before : null;
+            heights[index] = contacts.TryGetValue(index + 2, out var ending) ? HeightBeforeContact(ending, previous) : null;
+            heights[index] ??= index < afterFirst.Count ? afterFirst[index] : null;
+        }
+        return heights;
     }
 
-    // The application's own SMOOTH and FIRM impact limits anchor the curve.
-    internal static readonly (double X, double Score)[] GForceCurve =
-        { (0, 100), (AnalysisNumericPolicy.SmoothImpactG, 100), (AnalysisNumericPolicy.FirmImpactG, 60), (2.0, 0) };
-
-    internal static (double X, double Score)[] TouchdownZoneCurve(LandingDistanceAnalysis distance) => new[]
+    /// <summary>Highest height above the first contact in each airborne stretch after being on the ground.</summary>
+    private static IReadOnlyList<double> HeightsAfterContact(LandingRecord record)
     {
-        (0.0, 60.0), (distance.TargetZoneStartMeters, 100.0), (distance.TargetZoneEndMeters, 100.0),
-        (Math.Max(distance.TargetZoneEndMeters, distance.TouchdownZoneEndMeters), 50.0),
-        (Math.Max(distance.TargetZoneEndMeters, distance.TouchdownZoneEndMeters) + TouchdownZoneOverrunMeters, 0.0),
-    };
+        var heights = new List<double>();
+        double? reference = null, highest = null;
+        var landed = false;
+        foreach (var point in record.Series.Where(point => point.TimeSeconds >= 0 && Finite(point.AglFeet)).OrderBy(point => point.TimeSeconds))
+        {
+            reference ??= point.AglFeet;
+            if (point.OnGround)
+            {
+                landed = true;
+                if (highest is double ended) heights.Add(ended);
+                highest = null;
+            }
+            else if (landed) highest = Math.Max(highest ?? 0, point.AglFeet - reference.Value);
+        }
+        if (highest is double open) heights.Add(open);
+        return heights;
+    }
+
+    /// <summary>
+    /// Highest height above this contact while airborne since the previous one: back to the
+    /// previous contact's clock when both are recorded, otherwise back to the last sample on the
+    /// ground within <see cref="MaximumBounceSeconds"/>. Null when neither bounds the bounce.
+    /// </summary>
+    private static double? HeightBeforeContact(LandingRecord contact, LandingRecord? previous)
+    {
+        var reference = contact.Series.Where(point => point.TimeSeconds >= 0 && Finite(point.AglFeet))
+            .OrderBy(point => point.TimeSeconds).Select(point => (double?)point.AglFeet).FirstOrDefault();
+        if (reference == null) return null;
+        var previousClock = ContactClock(previous);
+        var contactClock = ContactClock(contact);
+        var clocked = previousClock.HasValue && contactClock.HasValue;
+        var earliest = clocked ? previousClock!.Value - contactClock!.Value : -MaximumBounceSeconds;
+        var highest = 0.0;
+        foreach (var point in contact.Series.Where(point => point.TimeSeconds < 0 && point.TimeSeconds > earliest && Finite(point.AglFeet))
+                     .OrderByDescending(point => point.TimeSeconds))
+        {
+            if (point.OnGround) return highest;
+            highest = Math.Max(highest, point.AglFeet - reference.Value);
+        }
+        return clocked ? highest : null;
+    }
+
+    private static double? ContactClock(LandingRecord? record) =>
+        record?.EstimatedContactTimeSeconds is double clock && Finite(clock) && clock != LandingRecord.NonFiniteStorageSentinel ? clock : null;
+
+    internal static (double X, double Score)[] VerticalSpeedCurve(LandingScoreCategory category)
+    {
+        // 2 ft/s is the mean sink speed measured in FAA video landing surveys;
+        // Boeing reports that crews and cabin staff typically report a hard
+        // landing near 4 ft/s; FAR 25.473 designs the gear for 6 ft/s at design
+        // takeoff weight and 10 ft/s at design landing weight. Light aircraft
+        // scale the curve to the 7 ft/s minimum of FAR 23.473(d).
+        var scale = category == LandingScoreCategory.Light ? .7 : 1;
+        return new[] { (0.0, 100.0), (120 * scale, 100.0), (240 * scale, 60.0), (360 * scale, 20.0), (600 * scale, 0.0) };
+    }
+
+    // ATR's FDM guidance raises its first touchdown-acceleration event at
+    // 1.4 G, CAAC's FOQA specification calls 1.8 G a severe deviation, and the
+    // 737 maintenance manual indicates a hard landing above 2.2 G.
+    internal static readonly (double X, double Score)[] GForceCurve =
+        { (0, 100), (AnalysisNumericPolicy.SmoothImpactG, 100), (1.4, 60), (1.8, 20), (2.2, 0) };
+
+    internal static (double X, double Score)[] TouchdownZoneCurve(LandingDistanceAnalysis distance)
+    {
+        // Full marks across the target zone, the first 1,000 ft beyond the
+        // aiming point: GAPPRE's normal touchdown area of 300-600 m, which held
+        // about 90% of A320 and 737 line landings in DOT/FAA/AR-07/7. GAPPRE's
+        // recommended SOP goes around when not touched down within the
+        // touchdown zone, so its end is the pass mark. On short runways a third
+        // of the remaining zone is kept for the decline. The short side and the
+        // overrun distances are this application's own.
+        var end = distance.TouchdownZoneEndMeters;
+        var aim = distance.TargetZoneStartMeters;
+        var full = Math.Min(distance.TargetZoneEndMeters, end - (end - aim) / 3);
+        return new[]
+        {
+            (0.0, 20.0), (aim, 100.0), (full, 100.0), (end, 60.0), (end + TouchdownZoneSevereMeters, 20.0),
+            (end + TouchdownZoneOverrunMeters, 0.0),
+        };
+    }
 
     internal static (double X, double Score)[] CenterlineCurve(double runwayWidthMeters)
     {
-        var edge = Math.Max(8, runwayWidthMeters / 2);
-        return new[] { (0.0, 100.0), (1.5, 100.0), (3.0, 85.0), (6.0, 50.0), (edge, 0.0) };
+        // GAPPRE's recommended SOP goes around when the main gear no longer
+        // straddles the centreline, about 3 m off for a narrow-body; that is the
+        // pass mark. Zero where its outer main wheel, 4.5 m out, would use up
+        // the 4.5 m edge clearance that ICAO runway widths provide; the other
+        // anchors are this application's own.
+        var zero = Math.Max(8, runwayWidthMeters / 2 - 9);
+        return new[] { (0.0, 100.0), (1.0, 100.0), (3.0, 60.0), (6.0, 20.0), (zero, 0.0) };
     }
 
-    internal static readonly (double X, double Score)[] CrabCurve = { (0, 100), (1, 100), (3, 80), (5, 40), (8, 0) };
+    // No published limit; this application's own. Boeing does not recommend a
+    // crab-only touchdown on a dry runway.
+    internal static readonly (double X, double Score)[] CrabCurve = { (0, 100), (1, 100), (3, 60), (5, 20), (8, 0) };
 
-    internal static readonly (double X, double Score)[] BankCurve = { (0, 100), (2, 100), (4, 70), (7, 20), (10, 0) };
+    // Boeing's 2.2 G hard-landing indication assumes no more than 2° of roll;
+    // CAAC flags roll from 50 ft to touchdown above 4° and 6°.
+    internal static readonly (double X, double Score)[] BankCurve = { (0, 100), (2, 100), (4, 60), (6, 20), (8, 0) };
 
     internal static (double X, double Score)[] PitchCurve(LandingScoreCategory category)
     {
-        // Nose-up band per category; scores fall toward a nose-first touchdown
-        // and toward typical tail-strike attitudes.
-        var (low, high) = category switch
+        // CAAC flags touchdown pitch below 1.0° and 0.5°, and above 80% and 90%
+        // of the tail-strike attitude. The nose-up band and the generic
+        // tail-strike attitude per category are this application's own.
+        var (low, high, tailStrike) = category switch
         {
-            LandingScoreCategory.Light => (3.0, 10.0),
-            LandingScoreCategory.Regional => (1.0, 7.0),
-            LandingScoreCategory.Heavy => (2.0, 6.5),
-            _ => (2.0, 7.0),
+            LandingScoreCategory.Light => (3.0, 10.0, 15.0),
+            LandingScoreCategory.Regional => (2.0, 6.5, 9.0),
+            LandingScoreCategory.Heavy => (2.5, 6.0, 9.0),
+            _ => (3.0, 6.5, 10.0),
         };
-        return new[] { (low - 4, 0.0), (low - 2, 50.0), (low, 100.0), (high, 100.0), (high + 2, 50.0), (high + 4, 0.0) };
+        return new[]
+        {
+            (0.0, 0.0), (0.5, 20.0), (1.0, 60.0), (low, 100.0), (high, 100.0),
+            (tailStrike * .8, 60.0), (tailStrike * .9, 20.0), (tailStrike, 0.0),
+        };
     }
 
     internal static double Evaluate(IReadOnlyList<(double X, double Score)> curve, double value)

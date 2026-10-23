@@ -110,7 +110,7 @@ internal static class LandingDistanceRegressionTests
             catch (Exception exception) when (exception is IOException || exception is System.Runtime.Serialization.SerializationException || exception is InvalidDataException)
             { Console.WriteLine($"skip {Path.GetFileName(path)}: {exception.GetType().Name}"); }
         }
-        var lines = new List<string> { "id,utc,airport,runway,contact,source,td_m,lateral_m,zone,aim_m,tch_ft,air_m,remaining_m,exit_remaining_m,threshold_known,end_s,end_m,end_gs_kt,category,score,vs,g,tdz,centerline,crab,bank,pitch,crab_deg,wind_kt" };
+        var lines = new List<string> { "id,utc,airport,runway,contact,source,td_m,lateral_m,zone,aim_m,tch_ft,air_m,remaining_m,exit_remaining_m,threshold_known,end_s,end_m,end_gs_kt,category,score,vs,g,tdz,centerline,crab,bank,pitch,crab_deg,wind_kt,vs_v,g_v,tdz_v,centerline_v,crab_v,bank_v,pitch_v,bounces,bounce_ft,bounce_score,uncapped" };
         var rendered = 0;
         foreach (var record in records.OrderByDescending(record => record.TimestampUtc))
         {
@@ -120,15 +120,19 @@ internal static class LandingDistanceRegressionTests
             if (analysis == null) continue;
             var scoreView = new LandingScoreView();
             scoreView.SetRecord(record, records);
-            var score = scoreView.Score!;
+            // Later contacts of a bounced landing are not scored.
+            var score = scoreView.Score;
+            var blank = string.Join(",", Enumerable.Repeat(string.Empty, 7));
             lines.Add(string.Join(",", record.Id, record.TimestampUtc.ToString("s", CultureInfo.InvariantCulture), analysis.AirportIdent, analysis.RunwayName,
                 $"{record.ContactNumber}/{record.ContactCount}", analysis.AimSource, F(analysis.TouchdownMeters), F(analysis.TouchdownLateralMeters, "0.0"),
                 analysis.Zone, F(analysis.AimingPointMeters), F(analysis.ThresholdCrossingHeightFeet), F(analysis.AirDistanceMeters),
                 F(analysis.RunwayRemainingMeters), F(analysis.ExitSpeedRemainingMeters), analysis.ThresholdOffsetKnown,
                 F(analysis.Samples[analysis.Samples.Count - 1].TimeSeconds, "0.0"), F(analysis.Samples[analysis.Samples.Count - 1].AlongMeters),
-                F(analysis.Samples[analysis.Samples.Count - 1].GroundSpeedKnots), score.Category, F(score.Total),
-                string.Join(",", score.Components.Select(component => F(component.Score))), F(score.CrabSignedDegrees, "0.00"),
-                F(record.WindSpeedKnotsAtContact, "0.0")));
+                F(analysis.Samples[analysis.Samples.Count - 1].GroundSpeedKnots), score?.Category.ToString() ?? "bounce", F(score?.Total),
+                score == null ? blank : string.Join(",", score.Components.Select(component => F(component.Score))), F(score?.CrabSignedDegrees, "0.00"),
+                F(record.WindSpeedKnotsAtContact, "0.0"), score == null ? blank : string.Join(",", score.Components.Select(component => F(component.Value, "0.00"))),
+                score?.BounceCount.ToString(CultureInfo.InvariantCulture) ?? string.Empty, score == null ? string.Empty : string.Join(";", score.BounceHeightsFeet.Select(height => F(height, "0.00"))), F(score?.BounceScore),
+                F(score?.UncappedTotal)));
             if (rendered++ < 12)
             {
                 view.SetHoverTime(-2);

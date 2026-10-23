@@ -1577,7 +1577,10 @@ public partial class MainWindow : Window
         {
             OverviewScoreValue.Text = "—";
             OverviewScoreScale.Visibility = Visibility.Collapsed;
-            OverviewScoreGrade.Text = string.Empty;
+            OverviewScoreGrade.Text = ScoreView.IsBounceContact
+                ? LocalizationManager.Text("Score.BounceContactShort").ToUpper(System.Globalization.CultureInfo.CurrentCulture)
+                : string.Empty;
+            OverviewScoreGrade.Foreground = LandingScoreView.BounceBrush;
         }
         else
         {

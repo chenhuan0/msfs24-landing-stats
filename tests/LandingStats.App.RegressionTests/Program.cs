@@ -252,7 +252,7 @@ internal static class Program
         Run("legacy Controls and 3D tabs follow recorded data and preserve selection", ReplayTabRegressionTests.RunAll);
         Run("3D replay pose, projection, gaps and legacy guards", LandingReplayRegressionTests.RunAll);
         Run("runway distance measures touchdown against threshold, aiming point and touchdown zone", LandingDistanceRegressionTests.RunAll);
-        Run("landing score weights seven criteria by category and rescales unavailable ones", LandingScoreRegressionTests.RunAll);
+        Run("landing score weights seven criteria by category, rescales unavailable ones and deducts bounces", LandingScoreRegressionTests.RunAll);
         Run("3D aircraft immutable geometry, silhouette and outward normals", ReplayAircraftModelRegressionTests.RunAll);
         Run("3D contact marker and visual suspension preserve recorded motion", ReplayGearRegistrationTests.RunAll);
         Run("3D replay storage, cloud backup and legacy compatibility", LandingReplayStorageRegressionTests.RunAll);
