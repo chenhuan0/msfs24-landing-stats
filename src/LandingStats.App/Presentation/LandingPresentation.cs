@@ -145,11 +145,16 @@ public sealed class LandingPresentation
     public string LandingFeelDisplay => LocalizationManager.Text(Record.IsSmoothLanding ? "Model.Smooth" :
         Record.IsNormalLanding ? "Model.Normal" : Record.IsFirmLanding ? "Model.Firm" : "Model.NotAvailable");
 
-    public string ImpactPeakDisplay => IsFinite(DisplayImpactPeak) && DisplayImpactPeak > 0 &&
+    /// <summary>The headline peak G, or null when the impact analysis has no valid peak.</summary>
+    internal double? ValidImpactPeakG => IsFinite(DisplayImpactPeak) && DisplayImpactPeak > 0 &&
         (UsesLegacyImpact || (Record.ImpactResult.Status != TouchdownImpactStatus.InvalidTelemetry &&
                              Record.ImpactResult.Status != TouchdownImpactStatus.Unavailable))
-            ? DisplayImpactPeak.ToString("F2", CultureInfo.CurrentCulture)
-            : LocalizationManager.Text("Model.NotAvailable");
+            ? DisplayImpactPeak
+            : null;
+
+    public string ImpactPeakDisplay => ValidImpactPeakG is double peak
+        ? peak.ToString("F2", CultureInfo.CurrentCulture)
+        : LocalizationManager.Text("Model.NotAvailable");
 
     public string GDetailDisplay => UsesLegacyImpact ? G2SecondsDisplay :
         Record.ImpactResult.IsComplete && Record.ImpactWindowSeconds.HasValue &&

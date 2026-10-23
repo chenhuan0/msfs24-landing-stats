@@ -90,6 +90,7 @@ public partial class MainWindow
         _googleDriveAuthorizationCancellation?.Cancel();
         Loaded -= OnWindowLoaded;
         ReplayView.TimeChanged -= OnChartHoverTimeChanged;
+        DistanceView.HoverTimeChanged -= OnChartHoverTimeChanged;
         foreach (var chart in _charts)
         {
             chart.HoverTimeChanged -= OnChartHoverTimeChanged;

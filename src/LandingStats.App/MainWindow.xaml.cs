@@ -49,6 +49,8 @@ public partial class MainWindow : Window
     private LandingChart[] _charts = Array.Empty<LandingChart>();
     private bool _showFullApproach;
     private bool _showReplay;
+    private bool _showDistance;
+    private bool _showScore;
     private int _primaryGearSeriesIndex;
     private int? _mainIsolatedSeriesIndex;
     private bool _changingLanguageSelection;
@@ -107,6 +109,7 @@ public partial class MainWindow : Window
         _versionAuthorBase = VersionAuthorRun.Text;
         _charts = new[] { MainChart, MiniGChart, MiniPowerChart, MiniGearChart };
         ReplayView.TimeChanged += OnChartHoverTimeChanged;
+        DistanceView.HoverTimeChanged += OnChartHoverTimeChanged;
         foreach (var chart in _charts)
         {
             chart.HoverTimeChanged += OnChartHoverTimeChanged;
@@ -246,6 +249,9 @@ public partial class MainWindow : Window
         DataContext = detail;
         MainChart.Record = detail;
         ReplayView.SetRecord(detail, replayContacts);
+        DistanceView.SetRecord(detail, replayContacts);
+        ScoreView.SetRecord(detail, replayContacts);
+        UpdateOverviewScore();
         UpdateControlTab(ReplayView.IsPlaybackAvailable, ReconstructionTab, ControlsTab);
         MiniGChart.Record = detail;
         MiniPowerChart.Record = detail;
@@ -278,6 +284,7 @@ public partial class MainWindow : Window
         {
             chart.SetHoverTime(time);
         }
+        DistanceView.SetHoverTime(time);
 
         if (DataContext is LandingRecord record)
         {
@@ -295,12 +302,14 @@ public partial class MainWindow : Window
     {
         _zoomStartSeconds = startSeconds;
         _zoomEndSeconds = endSeconds;
+        // Spatial and summary views use the whole recording, so lanes show its full time range.
+        var fullRange = _showReplay || _showDistance || _showScore;
         foreach (var chart in _charts)
         {
-            chart.SetZoomRange(_showReplay ? null : startSeconds, _showReplay ? null : endSeconds);
+            chart.SetZoomRange(fullRange ? null : startSeconds, fullRange ? null : endSeconds);
         }
 
-        Timeline.SetZoomRange(_showReplay ? null : startSeconds, _showReplay ? null : endSeconds);
+        Timeline.SetZoomRange(fullRange ? null : startSeconds, fullRange ? null : endSeconds);
         if (startSeconds.HasValue && endSeconds.HasValue)
         {
             ChartWindowButton.Content = LocalizationManager.Format(
@@ -423,6 +432,9 @@ public partial class MainWindow : Window
         DataContext = null;
         MainChart.Record = null;
         ReplayView.Record = null;
+        DistanceView.SetRecord(null);
+        ScoreView.SetRecord(null);
+        UpdateOverviewScore();
         UpdateControlTab(false, ReconstructionTab, ControlsTab);
         MiniGChart.Record = null;
         MiniPowerChart.Record = null;
@@ -1287,6 +1299,9 @@ public partial class MainWindow : Window
 
         UpdateHistoryPresentation(LandingHistoryList.Items.Count);
         ReplayView.RefreshLocalization();
+        DistanceView.RefreshLocalization();
+        ScoreView.RefreshLocalization();
+        UpdateOverviewScore();
         UpdateChartDescription(MainChart.Mode);
         UpdateModeUnit(MainChart.Mode);
         UpdateMainLegend(MainChart.Mode);
@@ -1339,13 +1354,20 @@ public partial class MainWindow : Window
         }
 
         var replay = modeName == "Reconstruction";
-        if (!replay && !Enum.TryParse(modeName, out LandingChartMode _)) return;
+        var distance = modeName == "Distance";
+        var score = modeName == "Score";
+        if (!replay && !distance && !score && !Enum.TryParse(modeName, out LandingChartMode _)) return;
         _showReplay = replay;
+        _showDistance = distance;
+        _showScore = score;
+        var customView = replay || distance || score;
         ReplayPanel.Visibility = replay ? Visibility.Visible : Visibility.Collapsed;
-        MainChart.Visibility = replay ? Visibility.Collapsed : Visibility.Visible;
-        ModeUnitText.Visibility = replay ? Visibility.Collapsed : Visibility.Visible;
-        ChartWindowButton.Visibility = replay ? Visibility.Collapsed : Visibility.Visible;
-        var mode = replay ? MainChart.Mode : (LandingChartMode)Enum.Parse(typeof(LandingChartMode), modeName);
+        DistancePanel.Visibility = distance ? Visibility.Visible : Visibility.Collapsed;
+        ScorePanel.Visibility = score ? Visibility.Visible : Visibility.Collapsed;
+        MainChart.Visibility = customView ? Visibility.Collapsed : Visibility.Visible;
+        ModeUnitText.Visibility = customView ? Visibility.Collapsed : Visibility.Visible;
+        ChartWindowButton.Visibility = customView ? Visibility.Collapsed : Visibility.Visible;
+        var mode = customView ? MainChart.Mode : (LandingChartMode)Enum.Parse(typeof(LandingChartMode), modeName);
         MainChart.Mode = mode;
         _mainIsolatedSeriesIndex = null;
         UpdateChartDescription(mode);
@@ -1371,9 +1393,20 @@ public partial class MainWindow : Window
 
     private void UpdateChartDescription(LandingChartMode mode)
     {
+        MainChartDescription.ToolTip = null;
         if (_showReplay)
         {
             MainChartDescription.Text = string.Empty;
+            return;
+        }
+        if (_showDistance || _showScore)
+        {
+            MainChartDescription.Text = LocalizationManager.Text(_showScore ? "Chart.DescriptionScore" : "Chart.DescriptionDistance");
+            MainChartDescription.ToolTip = new TextBlock
+            {
+                Text = LocalizationManager.Text(_showScore ? "Score.Hint" : "Distance.Hint"),
+                Style = (Style)FindResource("InfoToolTipTextStyle"),
+            };
             return;
         }
         var record = DataContext as LandingRecord;
@@ -1412,10 +1445,15 @@ public partial class MainWindow : Window
 
     private void UpdateMainLegend(LandingChartMode mode)
     {
-        if (_showReplay)
+        if (_showReplay || _showScore)
         {
             MainLegendPanel.Children.Clear();
             MainLegendSeparator.Visibility = Visibility.Collapsed;
+            return;
+        }
+        if (_showDistance)
+        {
+            UpdateDistanceLegend();
             return;
         }
         string[] labels;
@@ -1524,6 +1562,87 @@ public partial class MainWindow : Window
             };
             button.Click += OnMainLegendClick;
             MainLegendPanel.Children.Add(button);
+        }
+    }
+
+    // Below this width the overview measurements need the score cell's room.
+    private const double OverviewScoreMinimumWidth = 1150;
+    private const double OverviewScoreWidth = 132;
+
+    private void UpdateOverviewScore()
+    {
+        var score = ScoreView.Score;
+        var hint = LocalizationManager.Text("Score.OverviewHint");
+        if (score?.Total is not double total)
+        {
+            OverviewScoreValue.Text = "—";
+            OverviewScoreScale.Visibility = Visibility.Collapsed;
+            OverviewScoreGrade.Text = string.Empty;
+        }
+        else
+        {
+            var culture = System.Globalization.CultureInfo.CurrentCulture;
+            OverviewScoreValue.Text = Math.Round(total).ToString("0", culture);
+            OverviewScoreScale.Visibility = Visibility.Visible;
+            OverviewScoreGrade.Text = LocalizationManager.Text("Score.Grade." + LandingScoreView.Grade(total)).ToUpper(culture);
+            OverviewScoreGrade.Foreground = LandingScoreView.ScoreBrush(total);
+            hint = LocalizationManager.Format("Score.OverviewFormat",
+                LocalizationManager.Text("Score.Category." + score.Category),
+                score.Components.Count(component => component.Score.HasValue), score.Components.Count) + "\n\n" + hint;
+        }
+        OverviewScoreHint.Text = hint;
+        System.Windows.Automation.AutomationProperties.SetHelpText(OverviewScoreCell, hint);
+    }
+
+    private void OnOverviewMetricsSizeChanged(object sender, SizeChangedEventArgs eventArgs)
+    {
+        var visibility = eventArgs.NewSize.Width >= OverviewScoreMinimumWidth ? Visibility.Visible : Visibility.Collapsed;
+        if (OverviewScoreCell.Visibility == visibility) return;
+        OverviewScoreColumn.Width = new GridLength(visibility == Visibility.Visible ? OverviewScoreWidth : 0);
+        foreach (var element in new UIElement[] { OverviewScoreCell, OverviewScoreLabel, OverviewScoreValuePanel, OverviewScoreGrade })
+            element.Visibility = visibility;
+    }
+
+    private void OnOverviewScoreClick(object sender, MouseButtonEventArgs eventArgs)
+    {
+        if (DataContext is LandingRecord) ScoreTab.IsChecked = true;
+    }
+
+    private void UpdateDistanceLegend()
+    {
+        // Reference legend only: the distance view has no isolatable series.
+        // Zones are labelled in the plot itself.
+        var items = new (string Key, Brush Brush, bool Dashed)[]
+        {
+            ("Distance.LegendFlight", LandingChart.SeriesBrushAt(0), false),
+            ("Distance.LegendGround", LandingChart.SeriesBrushAt(1), false),
+            ("Distance.LegendGlidePath", LandingChart.SeriesBrushAt(2), true),
+        };
+        MainLegendPanel.Children.Clear();
+        MainLegendSeparator.Visibility = Visibility.Visible;
+        for (var index = 0; index < items.Length; index++)
+        {
+            var item = items[index];
+            var swatch = new Line
+            {
+                X1 = 0, X2 = 14, Y1 = 0, Y2 = 0, Stroke = item.Brush, StrokeThickness = 2,
+                StrokeDashArray = item.Dashed ? new DoubleCollection { 4, 3 } : null,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(index == 0 ? 0 : 22, 0, 0, 10),
+            };
+            content.Children.Add(swatch);
+            content.Children.Add(new TextBlock
+            {
+                Text = LocalizationManager.Text(item.Key),
+                FontSize = 11,
+                Foreground = (Brush)FindResource("MutedTextBrush"),
+                Margin = new Thickness(7, 0, 0, 0),
+            });
+            MainLegendPanel.Children.Add(content);
         }
     }
 

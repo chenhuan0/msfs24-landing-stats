@@ -21,6 +21,12 @@
                 <DataTrigger Binding="{Binding IsChecked, ElementName=ReconstructionTab}" Value="True">
                     <Setter Property="Visibility" Value="Collapsed" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=DistanceTab}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=ScoreTab}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
         <Style x:Key="NonReplayLaneRowStyle" TargetType="RowDefinition">
@@ -29,6 +35,14 @@
             <Setter Property="MaxHeight" Value="100" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsChecked, ElementName=ReconstructionTab}" Value="True">
+                    <Setter Property="Height" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=DistanceTab}" Value="True">
+                    <Setter Property="Height" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsChecked, ElementName=ScoreTab}" Value="True">
                     <Setter Property="Height" Value="0" />
                     <Setter Property="MinHeight" Value="0" />
                 </DataTrigger>
@@ -595,7 +609,7 @@
                             Click="OnChartWindowClick" VerticalAlignment="Top" FontSize="12" />
                 </Grid>
 
-                <Grid Grid.Row="1" Margin="24,18,24,20">
+                <Grid x:Name="OverviewMetricsGrid" Grid.Row="1" Margin="24,18,24,20" SizeChanged="OnOverviewMetricsSizeChanged">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="45" />
@@ -605,6 +619,8 @@
                         <ColumnDefinition Width="0.93*" />
                         <ColumnDefinition Width="1.20*" />
                         <ColumnDefinition Width="0.94*" />
+                        <!-- Fixed width: an Auto column spanning the star row changes how WPF sizes the Auto metric columns. -->
+                        <ColumnDefinition x:Name="OverviewScoreColumn" Width="132" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -788,6 +804,29 @@
                     </StackPanel>
                     <TextBlock Grid.Column="7" Grid.Row="1" Text="{Binding GroundSpeedDisplay}" FontSize="22" FontWeight="Medium" VerticalAlignment="Center" Margin="22,7,0,0" />
                     <TextBlock Grid.Column="7" Grid.Row="2" Text="{DynamicResource Metric.AtContact}" Style="{StaticResource MetricSublineStyle}" Margin="22,7,0,0" />
+
+                    <!-- Compact summary of the Score tab; a divider sets it apart from the measurements.
+                         Hidden on narrow windows so the measurements keep their room. -->
+                    <Grid x:Name="OverviewScoreCell" Grid.Column="8" Grid.RowSpan="3" Background="Transparent" Cursor="Hand"
+                          MouseLeftButtonUp="OnOverviewScoreClick"
+                          AutomationProperties.Name="{DynamicResource Metric.Score}">
+                        <Grid.ToolTip>
+                            <TextBlock x:Name="OverviewScoreHint" Style="{StaticResource InfoToolTipTextStyle}" />
+                        </Grid.ToolTip>
+                        <Border Width="1" HorizontalAlignment="Left" Background="{StaticResource BorderBrush}" />
+                    </Grid>
+                    <StackPanel x:Name="OverviewScoreLabel" Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0,0,0" IsHitTestVisible="False">
+                        <TextBlock Text="{DynamicResource Metric.Score}" Style="{StaticResource SectionLabelStyle}" Foreground="{StaticResource LabelTextBrush}" />
+                        <ContentControl Style="{StaticResource InfoIconStyle}" Focusable="False" />
+                    </StackPanel>
+                    <StackPanel x:Name="OverviewScoreValuePanel" Grid.Column="8" Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="22,7,4,0" IsHitTestVisible="False">
+                        <TextBlock x:Name="OverviewScoreValue" Text="—" FontSize="22" FontWeight="Medium" />
+                        <TextBlock x:Name="OverviewScoreScale" Text="{DynamicResource Score.OutOf}" Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="12" VerticalAlignment="Bottom" Margin="5,0,0,4" />
+                    </StackPanel>
+                    <TextBlock x:Name="OverviewScoreGrade" Grid.Column="8" Grid.Row="2" FontSize="9" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Margin="22,7,4,0" IsHitTestVisible="False" />
                 </Grid>
 
                 <Border x:Name="ClosureReconstructionPanel"
@@ -983,9 +1022,13 @@
                         <RadioButton Content="{DynamicResource Chart.TabAttitude}" Tag="Attitude" GroupName="ChartMode" Style="{StaticResource ChartTabStyle}" Checked="OnChartModeChanged" />
                         <RadioButton Content="{DynamicResource Chart.TabPower}" Tag="Power" GroupName="ChartMode" Style="{StaticResource ChartTabStyle}" Checked="OnChartModeChanged" />
                         <RadioButton Content="{DynamicResource Chart.TabGear}" Tag="Gear" GroupName="ChartMode" Style="{StaticResource ChartTabStyle}" Checked="OnChartModeChanged" />
+                        <RadioButton x:Name="DistanceTab" Content="{DynamicResource Chart.TabDistance}" Tag="Distance" GroupName="ChartMode" Style="{StaticResource ChartTabStyle}" Checked="OnChartModeChanged" />
+                        <RadioButton x:Name="ScoreTab" Content="{DynamicResource Chart.TabScore}" Tag="Score" GroupName="ChartMode" Style="{StaticResource ChartTabStyle}" Checked="OnChartModeChanged" />
                     </StackPanel>
-                    <TextBlock Grid.Column="2" x:Name="MainChartDescription" Text="{DynamicResource Chart.DescriptionVertical}"
-                               Foreground="{StaticResource SubtleTextBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="0,0,0,10" />
+                    <!-- On narrow windows the description yields its space before the legend does. -->
+                    <TextBlock Grid.Column="1" x:Name="MainChartDescription" Text="{DynamicResource Chart.DescriptionVertical}"
+                               Foreground="{StaticResource SubtleTextBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="16,0,0,10"
+                               HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
                     <Border x:Name="MainLegendSeparator" Grid.Column="3" Width="1" Height="12" Background="#262321" Margin="22,0,22,10" VerticalAlignment="Bottom" />
                     <StackPanel x:Name="MainLegendPanel" Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Bottom" />
                     <Border Grid.ColumnSpan="5" Height="1" Background="{StaticResource BorderBrush}" VerticalAlignment="Bottom" Panel.ZIndex="-1" />
@@ -995,6 +1038,12 @@
                     <controls:LandingChart x:Name="MainChart" Mode="VerticalSpeed" ShowLegend="False" ShowXAxisLabels="False" />
                     <Grid x:Name="ReplayPanel" Visibility="Collapsed" Margin="24,0,0,0">
                         <controls:LandingReplayView x:Name="ReplayView" />
+                    </Grid>
+                    <Grid x:Name="DistancePanel" Visibility="Collapsed">
+                        <controls:LandingDistanceView x:Name="DistanceView" />
+                    </Grid>
+                    <Grid x:Name="ScorePanel" Visibility="Collapsed">
+                        <controls:LandingScoreView x:Name="ScoreView" />
                     </Grid>
                     <TextBlock x:Name="ModeUnitText" Text="fpm" Foreground="{StaticResource LabelTextBrush}"
                                FontFamily="Cascadia Mono, Consolas" FontSize="10"

@@ -4,6 +4,11 @@ All notable changes to MSFS Landing Stats are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Distance tab: touchdown position against the threshold, aiming point, target zone and touchdown zone, with a runway plan, approach profile, threshold crossing height and remaining runway.
+- Score tab: a 0–100 touchdown rating from vertical speed, peak G, touchdown zone, centerline, crab, bank and pitch, showing each criterion's measurement, threshold and points. The total also appears in the landing overview.
+
 ### Improved
 
 - Recognize external replays, pause capture, and start fresh when pilot control returns. Keep the live rollout and skip captures without enough pre-touchdown data.

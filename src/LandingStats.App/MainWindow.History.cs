@@ -264,6 +264,10 @@ public partial class MainWindow
                 // chart zoom or the user's isolated series.
                 DataContext = null;
                 DataContext = selectedDetail;
+                // Runway and airport metadata can arrive after the first presentation.
+                DistanceView.SetRecord(selectedDetail, contacts);
+                ScoreView.SetRecord(selectedDetail, contacts);
+                UpdateOverviewScore();
                 if (!_presentedReplayRunways.SequenceEqual(contacts.Select(record => record.RunwayGeometry)))
                 {
                     var replayTime = ReplayView.CurrentTimeSeconds;
