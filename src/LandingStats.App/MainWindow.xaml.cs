@@ -375,6 +375,7 @@ public partial class MainWindow : Window
         AverageRateText.Text = !monthlyAverage.HasValue
             ? "—"
             : $"{monthlyAverage.Value:+0;-0;0} fpm";
+        RefreshHistoryScores();
     }
 
     internal static double? MonthlyAverageDisplayedFpm(IEnumerable<LandingRecord> records, DateTime localNow)

@@ -168,7 +168,7 @@ internal static class LandingScoreRegressionTests
         LandingDistanceRegressionTests.Render(empty, 800, 400);
     }
 
-    private static LandingRecord Airliner(LandingRecord record)
+    internal static LandingRecord Airliner(LandingRecord record)
     {
         record.InertialFpm = 120;
         record.PeakG150Milliseconds = 1.1;
@@ -180,7 +180,7 @@ internal static class LandingScoreRegressionTests
     }
 
     /// <summary>An ideal first contact that leaves the ground for one second per bounce, every other second from 1 s, peaking at each height.</summary>
-    private static LandingRecord Bounced(params double[] heightsFeet)
+    internal static LandingRecord Bounced(params double[] heightsFeet)
     {
         var record = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
         record.ContactCount = heightsFeet.Length + 1;
@@ -199,7 +199,7 @@ internal static class LandingScoreRegressionTests
     }
 
     /// <summary>The second contact of <paramref name="first"/>, airborne for <paramref name="gapSeconds"/> before it and peaking at <paramref name="heightFeet"/>.</summary>
-    private static LandingRecord SecondContact(LandingRecord first, double heightFeet, double gapSeconds, bool clocked)
+    internal static LandingRecord SecondContact(LandingRecord first, double heightFeet, double gapSeconds, bool clocked)
     {
         var record = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 550, lateral: .5, reciprocal: false));
         record.ContactNumber = 2;

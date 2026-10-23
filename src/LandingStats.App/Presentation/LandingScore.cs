@@ -35,6 +35,8 @@ internal sealed class LandingScoreComponent
 /// </summary>
 internal sealed class LandingScore
 {
+    /// <summary>Bump whenever a weight, curve, cap or bounce rule changes; cached history scores are then recomputed.</summary>
+    internal const int RulesVersion = 1;
     internal const double LightMaximumPounds = 12500;
     internal const double RegionalMaximumPounds = 100000;
     internal const double HeavyMinimumPounds = 300000;
@@ -103,6 +105,20 @@ internal sealed class LandingScore
     public double? LimitingScore => LimitedByBounce ? BounceScore : Weakest?.Score;
     /// <summary>Signed crab for display: positive when the nose points right of the ground track.</summary>
     public double? CrabSignedDegrees { get; private set; }
+
+    /// <summary>
+    /// Scores a first contact from its detail as the Score tab does, without preparing a replay
+    /// scene; <paramref name="records"/> supplies the details of its later contacts. Null for a
+    /// later contact, which is a bounce and is not scored.
+    /// </summary>
+    internal static LandingScore? ForFirstContact(LandingRecord record, IEnumerable<LandingRecord> records)
+    {
+        if (record.ContactNumber > 1) return null;
+        var episode = LandingReplayContacts.ForEpisode(record, records);
+        var track = LandingReplayTrack.TryCreate(record, out var created) ? created : null;
+        var contactTimes = track == null ? Array.Empty<double>() : LandingReplayContacts.ContactTimes(record, track, episode);
+        return Create(record, track, LandingDistanceAnalysis.Create(record, track, contactTimes), episode);
+    }
 
     /// <param name="episode">Other contacts of the same landing, used to measure the bounces they end.</param>
     public static LandingScore Create(LandingRecord record, LandingReplayTrack? track, LandingDistanceAnalysis? distance,

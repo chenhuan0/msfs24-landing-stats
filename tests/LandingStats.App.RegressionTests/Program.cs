@@ -59,6 +59,8 @@ internal static class Program
         if (args.Length == 2 && args[0] == "--live-source-probe") return LiveSourceProbe.Run(args[1]);
         if (args.Length == 2 && args[0] == "--live-stream-probe") return LiveStreamFreshnessProbe.Run(args[1]);
         if (args.Length == 2 && args[0] == "--live-runtime-probe") return LiveRuntimeRecoveryProbe.Run(args[1]);
+        if (args.Length == 2 && args[0] == "--score-timing")
+        { _ = new System.Windows.Application(); LocalizationManager.Apply("en"); return LandingDistanceRegressionTests.ScoreTiming(args[1]); }
         if (args.Length == 3 && args[0] == "--distance-preview")
         { _ = new System.Windows.Application(); LocalizationManager.Apply("en"); return LandingDistanceRegressionTests.Preview(args[1], args[2]); }
         if (args.Length == 3 && args[0] == "--guardian-fixture") return GuardianRegressionTests.Fixture(args[1], args[2]);
@@ -253,6 +255,9 @@ internal static class Program
         Run("3D replay pose, projection, gaps and legacy guards", LandingReplayRegressionTests.RunAll);
         Run("runway distance measures touchdown against threshold, aiming point and touchdown zone", LandingDistanceRegressionTests.RunAll);
         Run("landing score weights seven criteria by category, rescales unavailable ones and deducts bounces", LandingScoreRegressionTests.RunAll);
+        Run("landing score cache keeps totals per rules version and input stamp", HistoryScoreRegressionTests.Cache);
+        Run("landing score badge matches the Score tab and colors each grade", HistoryScoreRegressionTests.Badge);
+        Run("landing score history list scores in the background and reuses the cache", HistoryScoreRegressionTests.HistoryList);
         Run("3D aircraft immutable geometry, silhouette and outward normals", ReplayAircraftModelRegressionTests.RunAll);
         Run("3D contact marker and visual suspension preserve recorded motion", ReplayGearRegistrationTests.RunAll);
         Run("3D replay storage, cloud backup and legacy compatibility", LandingReplayStorageRegressionTests.RunAll);

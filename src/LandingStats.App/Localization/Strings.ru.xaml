@@ -18,6 +18,10 @@
     <system:String x:Key="Lifecycle.Closing">Сохранение локальных изменений и закрытие…</system:String>
     <system:String x:Key="History.Filter">Фильтр по самолёту или аэропорту</system:String>
     <system:String x:Key="History.Delete">Удалить посадку</system:String>
+    <system:String x:Key="History.BounceBadgeFormat">#{0}</system:String>
+    <system:String x:Key="History.ScorePending">Оценка посадки вычисляется…</system:String>
+    <system:String x:Key="History.ScoreToolTipFormat">Оценка посадки {1:0} / 100 · {0}</system:String>
+    <system:String x:Key="History.ScoreUnavailable">Недостаточно данных для оценки посадки</system:String>
     <system:String x:Key="History.AverageRate">Средняя вертикальная скорость за месяц</system:String>
     <system:String x:Key="History.NoLandingsTitle">ПОСАДОК ПОКА НЕТ</system:String>
     <system:String x:Key="History.NoLandingsBody">Запустите MSFS и начните снижение ниже 500 футов AGL. После касания запись, анализ и сохранение выполнятся автоматически.</system:String>

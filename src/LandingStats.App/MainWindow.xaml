@@ -16,6 +16,8 @@
         UseLayoutRounding="True">
     <Window.Resources>
         <presentation:LandingPresentationConverter x:Key="LandingPresentationConverter" />
+        <presentation:HistoryScoreStore x:Key="HistoryScores" />
+        <presentation:HistoryScoreConverter x:Key="HistoryScoreConverter" />
         <Style x:Key="NonReplayPanelStyle" TargetType="Border">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsChecked, ElementName=ReconstructionTab}" Value="True">
@@ -499,10 +501,45 @@
                         <DataTemplate>
                             <Grid DataContext="{Binding Converter={StaticResource LandingPresentationConverter}}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="60" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <!-- Landing score, colored by grade; later contacts are bounces and show their number. -->
+                                <Border Width="34" Height="26" CornerRadius="6" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <Border.Background>
+                                        <MultiBinding Converter="{StaticResource HistoryScoreConverter}" ConverterParameter="Background">
+                                            <Binding Path="Record" />
+                                            <Binding Source="{StaticResource HistoryScores}" />
+                                            <Binding Source="{StaticResource HistoryScores}" Path="Version" />
+                                        </MultiBinding>
+                                    </Border.Background>
+                                    <Border.ToolTip>
+                                        <MultiBinding Converter="{StaticResource HistoryScoreConverter}" ConverterParameter="ToolTip">
+                                            <Binding Path="Record" />
+                                            <Binding Source="{StaticResource HistoryScores}" />
+                                            <Binding Source="{StaticResource HistoryScores}" Path="Version" />
+                                        </MultiBinding>
+                                    </Border.ToolTip>
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontFamily="Cascadia Mono, Consolas" FontSize="13" FontWeight="SemiBold">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{StaticResource HistoryScoreConverter}" ConverterParameter="Text">
+                                                <Binding Path="Record" />
+                                                <Binding Source="{StaticResource HistoryScores}" />
+                                                <Binding Source="{StaticResource HistoryScores}" Path="Version" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                        <TextBlock.Foreground>
+                                            <MultiBinding Converter="{StaticResource HistoryScoreConverter}" ConverterParameter="Foreground">
+                                                <Binding Path="Record" />
+                                                <Binding Source="{StaticResource HistoryScores}" />
+                                                <Binding Source="{StaticResource HistoryScores}" Path="Version" />
+                                            </MultiBinding>
+                                        </TextBlock.Foreground>
+                                    </TextBlock>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding AircraftTitle}" FontSize="12" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                         <TextBlock Text="{Binding LocationDisplay}" Foreground="{StaticResource SubtleTextBrush}" FontSize="11" TextTrimming="CharacterEllipsis" />
@@ -510,7 +547,7 @@
                                         <TextBlock Text="{Binding TimestampDisplay}" Foreground="{StaticResource SubtleTextBrush}" FontSize="11" />
                                     </StackPanel>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <StackPanel.Style>
                                         <Style TargetType="{x:Type StackPanel}">
                                             <Style.Triggers>
@@ -524,7 +561,7 @@
                                     <TextBlock Text="{Binding ImpactPeakDisplay, StringFormat={}{0} G}" Foreground="{StaticResource SubtleTextBrush}"
                                                FontFamily="Cascadia Mono, Consolas" FontSize="10" Margin="0,2,0,0" HorizontalAlignment="Right" />
                                 </StackPanel>
-                                <Button Grid.Column="1"
+                                <Button Grid.Column="2"
                                         Style="{StaticResource HistoryDeleteButtonStyle}"
                                         HorizontalAlignment="Right"
                                         Tag="{Binding Record}"

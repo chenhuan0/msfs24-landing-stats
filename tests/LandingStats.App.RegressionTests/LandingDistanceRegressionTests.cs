@@ -97,19 +97,7 @@ internal static class LandingDistanceRegressionTests
     public static int Preview(string landingsDirectory, string outputDirectory)
     {
         Directory.CreateDirectory(outputDirectory);
-        var serializer = new DataContractJsonSerializer(typeof(LandingRecordFile));
-        var records = new List<LandingRecord>();
-        foreach (var path in Directory.EnumerateFiles(landingsDirectory, "*.landing.json.gz"))
-        {
-            try
-            {
-                using var file = File.OpenRead(path);
-                using var gzip = new GZipStream(file, CompressionMode.Decompress);
-                if (serializer.ReadObject(gzip) is LandingRecordFile payload) records.Add(payload.ToRecord());
-            }
-            catch (Exception exception) when (exception is IOException || exception is System.Runtime.Serialization.SerializationException || exception is InvalidDataException)
-            { Console.WriteLine($"skip {Path.GetFileName(path)}: {exception.GetType().Name}"); }
-        }
+        var records = LoadRecords(landingsDirectory);
         var lines = new List<string> { "id,utc,airport,runway,contact,source,td_m,lateral_m,zone,aim_m,tch_ft,air_m,remaining_m,exit_remaining_m,threshold_known,end_s,end_m,end_gs_kt,category,score,vs,g,tdz,centerline,crab,bank,pitch,crab_deg,wind_kt,vs_v,g_v,tdz_v,centerline_v,crab_v,bank_v,pitch_v,bounces,bounce_ft,bounce_score,uncapped" };
         var rendered = 0;
         foreach (var record in records.OrderByDescending(record => record.TimestampUtc))
@@ -147,6 +135,38 @@ internal static class LandingDistanceRegressionTests
 
         static string F(double? value, string format = "0") =>
             value is double number ? number.ToString(format, CultureInfo.InvariantCulture) : string.Empty;
+    }
+
+    /// <summary>Read-only timing of loading real history files and scoring every first contact, single-threaded.</summary>
+    public static int ScoreTiming(string landingsDirectory)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var records = LoadRecords(landingsDirectory);
+        var loaded = clock.Elapsed;
+        clock.Restart();
+        var scored = records.Where(record => record.ContactNumber == 1)
+            .Select(record => LandingScore.ForFirstContact(record, records)?.Total).Count(total => total.HasValue);
+        Console.WriteLine($"records {records.Count}: load {loaded.TotalSeconds:0.00} s ({loaded.TotalMilliseconds / Math.Max(1, records.Count):0.0} ms each), " +
+            $"score {clock.Elapsed.TotalSeconds:0.00} s ({clock.Elapsed.TotalMilliseconds / Math.Max(1, records.Count):0.0} ms each), {scored} scored");
+        return 0;
+    }
+
+    private static List<LandingRecord> LoadRecords(string landingsDirectory)
+    {
+        var serializer = new DataContractJsonSerializer(typeof(LandingRecordFile));
+        var records = new List<LandingRecord>();
+        foreach (var path in Directory.EnumerateFiles(landingsDirectory, "*.landing.json.gz"))
+        {
+            try
+            {
+                using var file = File.OpenRead(path);
+                using var gzip = new GZipStream(file, CompressionMode.Decompress);
+                if (serializer.ReadObject(gzip) is LandingRecordFile payload) records.Add(payload.ToRecord());
+            }
+            catch (Exception exception) when (exception is IOException || exception is System.Runtime.Serialization.SerializationException || exception is InvalidDataException)
+            { Console.WriteLine($"skip {Path.GetFileName(path)}: {exception.GetType().Name}"); }
+        }
+        return records;
     }
 
     private static LandingDistanceAnalysis Analyse(LandingRecord record) =>

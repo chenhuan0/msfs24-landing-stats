@@ -18,10 +18,13 @@ public sealed class LandingScoreView : FrameworkElement
     private static readonly Brush MutedBrush = Brush("#8A837B");
     private static readonly Brush SubtleBrush = Brush("#6B655F");
     private static readonly Brush TextBrush = Brush("#F5F3F0");
-    private static readonly Brush GreenBrush = Brush("#8FD6A8");
     private static readonly Brush AmberBrush = Brush("#D9C46A");
-    private static readonly Brush DangerBrush = Brush("#FF8A6A");
     private static readonly Brush TrackBrush = Brush("#1F1D1B");
+    // One color per grade, from Excellent to Bad, with a faint tint for badges.
+    private static readonly string[] GradeNames = { "Excellent", "Good", "Fair", "Poor", "Bad" };
+    private static readonly string[] GradeColors = { "7FD9A4", "B9D872", "E0C25E", "F09A5A", "FF7B6B" };
+    private static readonly Brush[] GradeBrushes = GradeColors.Select(color => Brush("#" + color)).ToArray();
+    private static readonly Brush[] GradeTints = GradeColors.Select(color => Brush("#26" + color)).ToArray();
     private static readonly Pen GridPen = Pen(GridBrush, 1);
     private static readonly Pen TickPen = Pen(Brush("#34302D"), 1);
 
@@ -238,12 +241,19 @@ public sealed class LandingScoreView : FrameworkElement
         };
     }
 
-    internal static string Grade(double total) =>
-        total >= 90 ? "Excellent" : total >= 80 ? "Good" : total >= 65 ? "Fair" : total >= 50 ? "Poor" : "Bad";
+    internal static string Grade(double total) => GradeNames[GradeIndex(total)];
 
-    internal static Brush ScoreBrush(double score) => score >= 80 ? GreenBrush : score >= 60 ? AmberBrush : DangerBrush;
+    internal static Brush ScoreBrush(double score) => GradeBrushes[GradeIndex(score)];
+
+    internal static Brush ScoreTintBrush(double score) => GradeTints[GradeIndex(score)];
+
+    private static int GradeIndex(double score) => score >= 90 ? 0 : score >= 80 ? 1 : score >= 65 ? 2 : score >= 50 ? 3 : 4;
 
     internal static Brush BounceBrush => AmberBrush;
+
+    internal static Brush NeutralBrush => SubtleBrush;
+
+    internal static Brush NeutralTintBrush => TrackBrush;
 
     private double DrawWrapped(DrawingContext context, string text, Brush brush, double size, double y)
     {

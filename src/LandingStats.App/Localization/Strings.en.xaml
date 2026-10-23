@@ -18,6 +18,10 @@
     <system:String x:Key="Lifecycle.Closing">Saving local changes and closing…</system:String>
     <system:String x:Key="History.Filter">Filter by aircraft or airport</system:String>
     <system:String x:Key="History.Delete">Delete landing</system:String>
+    <system:String x:Key="History.BounceBadgeFormat">#{0}</system:String>
+    <system:String x:Key="History.ScorePending">Calculating the landing score…</system:String>
+    <system:String x:Key="History.ScoreToolTipFormat">Landing score {1:0} / 100 · {0}</system:String>
+    <system:String x:Key="History.ScoreUnavailable">Not enough data to score this landing</system:String>
     <system:String x:Key="History.AverageRate">Average vertical rate this month</system:String>
     <system:String x:Key="History.NoLandingsTitle">NO LANDING SESSIONS</system:String>
     <system:String x:Key="History.NoLandingsBody">Start MSFS and descend through 500 ft AGL. Recording, analysis and storage happen automatically after touchdown.</system:String>
