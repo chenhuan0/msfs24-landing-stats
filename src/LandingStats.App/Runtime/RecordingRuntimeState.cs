@@ -109,6 +109,7 @@ internal sealed class RecordingRuntimeState
         _coordinator.StatusChanged += (_, args) => Effects.Presentation.Add(args);
         _coordinator.AircraftGroundStateChanged += (_, args) => Effects.Presentation.Add(args);
         _coordinator.EpisodeStarted += (_, args) => Effects.Presentation.Add(args);
+        _coordinator.TouchdownObserved += (_, args) => Effects.Presentation.Add(args);
         _coordinator.EpisodeCompleted += (_, args) => Capture(args, false);
         _coordinator.ApproachInterrupted += (_, args) => Capture(args, true);
         _coordinator.RawDebugCaptureStarted += (_, args) => Effects.RawCapture.Add(args);

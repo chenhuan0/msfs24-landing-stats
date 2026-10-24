@@ -83,7 +83,9 @@ internal static class RecordingRuntimeStateRegressionTests
             var blob = reader.ReadBytes(reader.ReadInt32());
             if (i == 3)
             {
-                Check(BitConverter.ToInt32(blob, 0) == 0x3443454c, "Update the explicit legacy coordinator fixture.");
+                Check(BitConverter.ToInt32(blob, 0) == 0x3543454c, "Update the explicit legacy coordinator fixture.");
+                Check(BitConverter.ToInt32(blob, blob.Length - sizeof(int)) == -1, "Legacy fixture has a pending touchdown notice.");
+                blob = blob.Take(blob.Length - sizeof(int)).ToArray();
                 Check(blob.Skip(blob.Length - 2).All(b => b == 0), "Legacy fixture has unexpected replay approach state.");
                 blob = blob.Take(blob.Length - 2).ToArray();
                 // This fixture has one final observation, no pending frozen

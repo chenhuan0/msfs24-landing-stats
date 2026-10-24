@@ -258,6 +258,11 @@ internal static class Program
         Run("landing score cache keeps totals per rules version and input stamp", HistoryScoreRegressionTests.Cache);
         Run("landing score badge matches the Score tab and colors each grade", HistoryScoreRegressionTests.Badge);
         Run("landing score history list scores in the background and reuses the cache", HistoryScoreRegressionTests.HistoryList);
+        Run("touchdown notice reads first-contact vertical speed, peak G and runway position live", TouchdownCardRegressionTests.Builder);
+        Run("touchdown notice is published once per landing and survives recovery", TouchdownCardRegressionTests.Coordinator);
+        Run("touchdown card grades its readings on the Score tab's curves", TouchdownCardRegressionTests.Card);
+        Run("touchdown card preference defaults on and persists locally", TouchdownCardRegressionTests.Settings);
+        Run("touchdown card is placed by its chosen position on the simulator's monitor", TouchdownCardRegressionTests.Placement);
         Run("3D aircraft immutable geometry, silhouette and outward normals", ReplayAircraftModelRegressionTests.RunAll);
         Run("3D contact marker and visual suspension preserve recorded motion", ReplayGearRegistrationTests.RunAll);
         Run("3D replay storage, cloud backup and legacy compatibility", LandingReplayStorageRegressionTests.RunAll);

@@ -35,6 +35,7 @@ internal sealed partial class LandingEpisodeCoordinator
     public event EventHandler? RawDebugCaptureStopped;
     public event EventHandler<AircraftGroundStateEventArgs>? AircraftGroundStateChanged;
     public event EventHandler? MetadataRequested;
+    public event EventHandler<TouchdownNoticeEventArgs>? TouchdownObserved;
 
     internal bool IsRecording => _episodeSamples != null;
     internal bool HasContact => _lastContactTime.HasValue;
@@ -161,6 +162,8 @@ internal sealed partial class LandingEpisodeCoordinator
     private double _lastSimulationTime = double.NaN;
     private double _episodeStartTime;
     private double? _lastContactTime;
+    // Episode frame index of a first contact whose touchdown notice is pending; -1 otherwise.
+    private int _touchdownNoticeIndex = -1;
     private readonly TelemetryContactContinuity _contactContinuity = new TelemetryContactContinuity();
     private bool _previousOnGround = true;
     private bool _armed = true;
@@ -331,6 +334,9 @@ internal sealed partial class LandingEpisodeCoordinator
                     return;
                 }
             }
+            // Bounces end later contacts of the same episode; only the first gets a notice.
+            if (!_lastContactTime.HasValue && _episodeSamples != null && _episodeSamples.Count != 0 && _episodeSamples[_episodeSamples.Count - 1].OnGround)
+                _touchdownNoticeIndex = _episodeSamples.Count - 1;
             _lastContactTime = sampleTime;
             _episodeDecisionJournal?.Record(sampleTime, "recorder", "contact_flag_transition",
                 "Observed an airborne-to-ground flag transition; restart post-contact capture from this contact.",
@@ -343,6 +349,7 @@ internal sealed partial class LandingEpisodeCoordinator
         }
 
         _previousOnGround = sample.OnGround;
+        if (_touchdownNoticeIndex >= 0) PublishTouchdownNotice();
 
         if (rejectedContact && _episodeSamples != null)
         {
@@ -390,6 +397,14 @@ internal sealed partial class LandingEpisodeCoordinator
         }
     }
 
+    private void PublishTouchdownNotice()
+    {
+        var notice = TouchdownNoticeBuilder.TryCreate(_activeEpisodeId, _utcNow(), _episodeSamples!, _touchdownNoticeIndex, _facilities.ApproachRunways);
+        if (notice == null) return;
+        _touchdownNoticeIndex = -1;
+        TouchdownObserved?.Invoke(this, notice);
+    }
+
     private void UpdateAircraftGroundState(bool onGround)
     {
         if (_aircraftOnGround == onGround)
@@ -417,6 +432,7 @@ internal sealed partial class LandingEpisodeCoordinator
 
         _episodeStartTime = TimeOf(trigger);
         _lastContactTime = null;
+        _touchdownNoticeIndex = -1;
         _armed = false;
         _episodeDecisionJournal = new TelemetryDecisionJournal(_pendingLifecycleJournal.Snapshot());
         _pendingLifecycleJournal = new TelemetryDecisionJournal();
@@ -495,6 +511,7 @@ internal sealed partial class LandingEpisodeCoordinator
         _activeEpisodeId = 0;
         _activePersistentId = Guid.Empty;
         _lastContactTime = null;
+        _touchdownNoticeIndex = -1;
         _armed = true;
         _preRoll.Clear();
         if (samples != null) PublishCaptureStatus();
@@ -553,6 +570,7 @@ internal sealed partial class LandingEpisodeCoordinator
         _activeEpisodeId = 0;
         _activePersistentId = Guid.Empty;
         _lastContactTime = null;
+        _touchdownNoticeIndex = -1;
     }
 
     internal void CompleteEpisodeWithReason(string reason, bool refreshAirportFacilities = true)

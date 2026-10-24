@@ -37,6 +37,7 @@
     <Compile Include="../LandingStats.App/Telemetry/ISimulatorSourceContext.cs" Link="Telemetry/ISimulatorSourceContext.cs" />
     <Compile Include="../LandingStats.App/Telemetry/IEpisodeFacilityPort.cs" Link="Telemetry/IEpisodeFacilityPort.cs" />
     <Compile Include="../LandingStats.App/Telemetry/RunwayResolver.cs" Link="Telemetry/RunwayResolver.cs" />
+    <Compile Include="../LandingStats.App/Telemetry/TouchdownNotice.cs" Link="Telemetry/TouchdownNotice.cs" />
     <Compile Include="../LandingStats.App/Telemetry/AirportResolver.cs" Link="Telemetry/AirportResolver.cs" />
     <Compile Include="../LandingStats.App/Telemetry/LandingSiteResolver.cs" Link="Telemetry/LandingSiteResolver.cs" />
     <InternalsVisibleTo Include="MSFS-Landing-Stats" />

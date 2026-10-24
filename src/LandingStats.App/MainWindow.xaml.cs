@@ -911,6 +911,7 @@ public partial class MainWindow : Window
         SetAutoStartSelection(_settings.StartWithSimulator == true);
         RefreshTelemetrySettingsPresentation();
         RefreshIntegrationApiSettingsPresentation();
+        RefreshTouchdownCardSettingsPresentation();
         SettingsAutoStartStateText.Text = !_autoStartInitialized
             ? (showLoading ? LocalizationManager.Text("Settings.Loading") : string.Empty)
             : _settings.StartWithSimulator == true

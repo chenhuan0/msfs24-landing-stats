@@ -44,7 +44,13 @@ internal static class RunwayResolver
             journal?.Record(0, "runway", "touchdown_position_invalid", "Touchdown coordinates are invalid.");
             return null;
         }
+        return Select(trackHeading, latitude, longitude, runways, journal);
+    }
 
+    /// <summary>The same association from a ground track and a contact position.</summary>
+    internal static RunwayFacility? Select(double trackHeading, double latitude, double longitude, IEnumerable<RunwayFacility> runways,
+        TelemetryDecisionJournal? journal = null)
+    {
         RunwayFacility? match = null;
         foreach (var runway in runways)
         {
@@ -119,9 +125,9 @@ internal static class RunwayResolver
                Math.Cos((latitude + otherLatitude) * Math.PI / 360);
     }
 
-    private static bool ValidPosition(double latitude, double longitude) =>
+    internal static bool ValidPosition(double latitude, double longitude) =>
         RunwayNumber.IsFinite(latitude) && Math.Abs(latitude) <= 90 &&
         RunwayNumber.IsFinite(longitude) && Math.Abs(longitude) <= 180;
 
-    private static double NormalizeAngle(double degrees) => ((degrees + 180) % 360 + 360) % 360 - 180;
+    internal static double NormalizeAngle(double degrees) => ((degrees + 180) % 360 + 360) % 360 - 180;
 }

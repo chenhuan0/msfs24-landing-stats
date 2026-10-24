@@ -23,6 +23,7 @@ internal sealed partial class EpisodeFacilityCoordinator : IEpisodeFacilityPort
     public Task<IReadOnlyList<RunwayFacility>>? RunwayTask => _runwaySnapshotCompletion?.Task;
     public Task<EpisodeFacilitySnapshot>? SnapshotTask => _episodeFacilityCompletion?.Task;
     public IReadOnlyList<AirportFacility> CachedAirports => _query.CachedAirports;
+    public IReadOnlyList<RunwayFacility> ApproachRunways => _runwayLookupIsPreliminary && !_runwayStageCompleted ? QuerySnapshot.Runways : _preliminaryRunways;
     internal bool IsPreliminary => _runwayLookupIsPreliminary;
     public void BeginEpisode(long id) => BeginRunwayEpisode(id);
     public void RequestPreliminary(TelemetrySample trigger, IReadOnlyList<TelemetrySample> samples) => RequestPreliminaryRunways(trigger, samples);

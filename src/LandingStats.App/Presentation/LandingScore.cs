@@ -330,16 +330,20 @@ internal sealed class LandingScore
 
     private void ResolveCategory(LandingRecord record)
     {
-        if (Finite(record.WeightPounds) && record.WeightPounds > 0)
-        {
-            CategoryFromWeight = true;
-            Category = record.WeightPounds < LightMaximumPounds ? LandingScoreCategory.Light :
-                record.WeightPounds < RegionalMaximumPounds ? LandingScoreCategory.Regional :
-                record.WeightPounds >= HeavyMinimumPounds ? LandingScoreCategory.Heavy : LandingScoreCategory.Airliner;
-            return;
-        }
-        var speed = Finite(record.AirspeedKnots) ? record.AirspeedKnots : 0;
-        Category = speed < 90 ? LandingScoreCategory.Light : speed < 115 ? LandingScoreCategory.Regional :
+        Category = CategoryFor(record.WeightPounds, record.AirspeedKnots, out var fromWeight);
+        CategoryFromWeight = fromWeight;
+    }
+
+    /// <summary>The category from landing weight, otherwise from contact airspeed.</summary>
+    internal static LandingScoreCategory CategoryFor(double weightPounds, double airspeedKnots, out bool fromWeight)
+    {
+        fromWeight = Finite(weightPounds) && weightPounds > 0;
+        if (fromWeight)
+            return weightPounds < LightMaximumPounds ? LandingScoreCategory.Light :
+                weightPounds < RegionalMaximumPounds ? LandingScoreCategory.Regional :
+                weightPounds >= HeavyMinimumPounds ? LandingScoreCategory.Heavy : LandingScoreCategory.Airliner;
+        var speed = Finite(airspeedKnots) ? airspeedKnots : 0;
+        return speed < 90 ? LandingScoreCategory.Light : speed < 115 ? LandingScoreCategory.Regional :
             speed < 150 ? LandingScoreCategory.Airliner : LandingScoreCategory.Heavy;
     }
 

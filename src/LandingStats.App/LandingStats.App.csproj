@@ -147,6 +147,7 @@
     <Compile Remove="Telemetry/ISimulatorSourceContext.cs" />
     <Compile Remove="Telemetry/IEpisodeFacilityPort.cs" />
     <Compile Remove="Telemetry/RunwayResolver.cs" />
+    <Compile Remove="Telemetry/TouchdownNotice.cs" />
     <Compile Remove="Telemetry/AirportResolver.cs" />
     <Compile Remove="Telemetry/LandingSiteResolver.cs" />
     <Compile Remove="Runtime/DurableFile.cs" />

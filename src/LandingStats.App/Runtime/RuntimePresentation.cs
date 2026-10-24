@@ -48,6 +48,14 @@ internal sealed class RuntimePresentationSnapshot
     public bool AnalysisPending { get; }
     public bool AnalysisFailed { get; }
     public RuntimeFailureNotice? Failure { get; internal set; }
+    /// <summary>Latest preliminary first-contact readings; transient, never restored from storage.</summary>
+    public RuntimeTouchdownNotice? Touchdown { get; internal set; }
+}
+internal sealed class RuntimeTouchdownNotice
+{
+    public RuntimeTouchdownNotice(Guid episode, TouchdownNoticeEventArgs readings) { Episode = episode; Readings = readings; }
+    public Guid Episode { get; }
+    public TouchdownNoticeEventArgs Readings { get; }
 }
 internal sealed class RuntimeFailureNotice
 {
@@ -78,6 +86,7 @@ internal sealed class RuntimePresentation
     private bool _simulatorExited;
     private RuntimeCloudNotice? _cloud;
     private RuntimeFailureNotice? _failure;
+    private RuntimeTouchdownNotice? _touchdown;
     public void Failure(string component, Guid entity, string message)
     {
         lock (_gate)
@@ -103,6 +112,8 @@ internal sealed class RuntimePresentation
                     if (episode != _activeEpisode) _failedAnalysis = Guid.Empty;
                     _activeOrdinal = started.EpisodeId; _activeEpisode = episode;
                 }
+                else if (item is TouchdownNoticeEventArgs touchdown)
+                    _touchdown = new RuntimeTouchdownNotice(StableRuntimeIdentity.Episode(identity.CaptureSessionId, touchdown.EpisodeId), touchdown);
             }
             // Recording effects reach this projection only after their inputs
             // are durable. History may already have won the race to publish.
@@ -159,7 +170,7 @@ internal sealed class RuntimePresentation
                 _airborne, _activeEpisode, _activeOrdinal, _simulatorExited,
                 _episodes.Values.OrderBy(value => value.TimestampUtc).ToArray(), _health.Values.ToArray(), _upload, _uploadState, _cloud,
                 _activeEpisode != Guid.Empty && _pendingAnalysis == _activeEpisode,
-                _activeEpisode != Guid.Empty && _pendingAnalysis == _activeEpisode && _failedAnalysis == _activeEpisode) { Failure = _failure };
+                _activeEpisode != Guid.Empty && _pendingAnalysis == _activeEpisode && _failedAnalysis == _activeEpisode) { Failure = _failure, Touchdown = _touchdown };
         }
     }
     public async Task RunAsync(ManagedComponentContext owner)

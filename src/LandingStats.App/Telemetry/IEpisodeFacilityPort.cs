@@ -15,6 +15,8 @@ internal interface IEpisodeFacilityPort
     Task<IReadOnlyList<RunwayFacility>>? RunwayTask { get; }
     Task<EpisodeFacilitySnapshot>? SnapshotTask { get; }
     IReadOnlyList<AirportFacility> CachedAirports { get; }
+    /// <summary>Approach runway candidates so far, read without freezing lookup progress.</summary>
+    IReadOnlyList<RunwayFacility> ApproachRunways { get; }
     void BeginEpisode(long episodeId);
     void RequestPreliminary(TelemetrySample trigger, IReadOnlyList<TelemetrySample> samples);
     void RequestFinal(IReadOnlyList<TelemetrySample> samples);

@@ -49,6 +49,8 @@ internal sealed class ApplicationSettingsOwner
                 if (baseline.GoogleDrivePromptAnswered != target.GoogleDrivePromptAnswered) merged.GoogleDrivePromptAnswered = target.GoogleDrivePromptAnswered;
                 if (baseline.AutomaticTelemetryUpload != target.AutomaticTelemetryUpload) merged.AutomaticTelemetryUpload = target.AutomaticTelemetryUpload;
                 if (baseline.IntegrationApiEnabled != target.IntegrationApiEnabled) merged.IntegrationApiEnabled = target.IntegrationApiEnabled;
+                if (baseline.TouchdownCardEnabled != target.TouchdownCardEnabled) merged.TouchdownCardEnabled = target.TouchdownCardEnabled;
+                if (baseline.TouchdownCardPosition != target.TouchdownCardPosition) merged.TouchdownCardPosition = target.TouchdownCardPosition;
                 var previousAutoStart = _current.StartWithSimulator;
                 var restore = baseline.StartWithSimulator != target.StartWithSimulator && rollback != null
                     ? () => _autoStart.SetEnabled(previousAutoStart == true) : rollback;

@@ -1440,6 +1440,61 @@
                             BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                             Padding="16" Margin="0,12,0,0">
                         <StackPanel>
+                            <TextBlock Text="{DynamicResource Settings.TouchdownCardTitle}"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Foreground="{StaticResource LabelTextBrush}" />
+                            <TextBlock Text="{DynamicResource Settings.TouchdownCardBody}"
+                                       Foreground="{StaticResource MutedTextBrush}"
+                                       FontSize="11" LineHeight="17" TextWrapping="Wrap" Margin="0,7,0,0" />
+                            <DockPanel Margin="0,15,0,0">
+                                <Button x:Name="TouchdownCardPreviewButton"
+                                        DockPanel.Dock="Right"
+                                        Content="{DynamicResource Settings.TouchdownCardPreview}"
+                                        Height="30" Margin="12,0,0,0" VerticalAlignment="Center"
+                                        Style="{StaticResource OutlineButtonStyle}"
+                                        Click="OnTouchdownCardPreviewClick" />
+                                <CheckBox x:Name="SettingsTouchdownCardCheckBox"
+                                          Style="{StaticResource SettingsToggleStyle}"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="{DynamicResource Settings.TouchdownCardToggle}"
+                                          Checked="OnTouchdownCardSelectionChanged"
+                                          Unchecked="OnTouchdownCardSelectionChanged">
+                                    <TextBlock Text="{DynamicResource Settings.TouchdownCardToggle}"
+                                               TextWrapping="Wrap" />
+                                </CheckBox>
+                            </DockPanel>
+                            <TextBlock Text="{DynamicResource Settings.TouchdownCardPosition}"
+                                       Foreground="{StaticResource LabelTextBrush}"
+                                       FontSize="11" Margin="0,14,0,0" />
+                            <WrapPanel Margin="0,8,0,-8">
+                                <RadioButton x:Name="SettingsTouchdownCardTopLeft"
+                                             Content="{DynamicResource Settings.TouchdownCardTopLeft}"
+                                             Tag="TopLeft" GroupName="TouchdownCardPosition"
+                                             Style="{StaticResource SettingsChoiceStyle}" Margin="0,0,8,8"
+                                             Checked="OnTouchdownCardPositionChanged" />
+                                <RadioButton x:Name="SettingsTouchdownCardTopCenter"
+                                             Content="{DynamicResource Settings.TouchdownCardTopCenter}"
+                                             Tag="TopCenter" GroupName="TouchdownCardPosition"
+                                             Style="{StaticResource SettingsChoiceStyle}" Margin="0,0,8,8"
+                                             Checked="OnTouchdownCardPositionChanged" />
+                                <RadioButton x:Name="SettingsTouchdownCardTopRight"
+                                             Content="{DynamicResource Settings.TouchdownCardTopRight}"
+                                             Tag="TopRight" GroupName="TouchdownCardPosition"
+                                             Style="{StaticResource SettingsChoiceStyle}" Margin="0,0,8,8"
+                                             Checked="OnTouchdownCardPositionChanged" />
+                                <RadioButton x:Name="SettingsTouchdownCardBottomCenter"
+                                             Content="{DynamicResource Settings.TouchdownCardBottomCenter}"
+                                             Tag="BottomCenter" GroupName="TouchdownCardPosition"
+                                             Style="{StaticResource SettingsChoiceStyle}" Margin="0,0,8,8"
+                                             Checked="OnTouchdownCardPositionChanged" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource SurfaceBrush}" CornerRadius="8"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Padding="16" Margin="0,12,0,0">
+                        <StackPanel>
                             <TextBlock Text="{DynamicResource Settings.DriveTitle}"
                                        Style="{StaticResource SectionLabelStyle}"
                                        Foreground="{StaticResource LabelTextBrush}" />

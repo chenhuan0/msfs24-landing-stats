@@ -35,6 +35,7 @@ public partial class MainWindow
     {
         var shutdown = _windowShutdown.BeginAsync(DrainWindowShutdownAsync);
         _isClosed = true;
+        CloseTouchdownCard();
         _settingsLoadingIndicator.Cancel();
         StopAcceptingSettingsOperations();
         StopHistoryOperations();
@@ -125,6 +126,7 @@ public partial class MainWindow
     {
         if (_shutdownResourcesDisposed) return;
         _shutdownResourcesDisposed = true;
+        CloseTouchdownCard();
         _services.Settings.Changed -= OnCommittedSettingsChanged;
         _releaseUpdater.Dispose();
 

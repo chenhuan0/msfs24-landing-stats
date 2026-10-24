@@ -366,6 +366,7 @@ internal static class ReplayRecordingRegressionTests
         public Task<IReadOnlyList<RunwayFacility>>? RunwayTask => null;
         public Task<EpisodeFacilitySnapshot>? SnapshotTask => null;
         public IReadOnlyList<AirportFacility> CachedAirports => Array.Empty<AirportFacility>();
+        public IReadOnlyList<RunwayFacility> ApproachRunways => Array.Empty<RunwayFacility>();
         public void SetDecisionContext(TelemetryDecisionJournal? journal, double time) { }
         public void BeginEpisode(long episodeId) => EpisodeId = episodeId;
         public void RequestPreliminary(TelemetrySample trigger, IReadOnlyList<TelemetrySample> samples) { }

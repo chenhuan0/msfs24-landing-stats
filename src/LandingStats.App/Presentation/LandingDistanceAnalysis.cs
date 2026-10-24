@@ -158,6 +158,31 @@ internal sealed class LandingDistanceAnalysis
         return result;
     }
 
+    /// <summary>
+    /// Touchdown position and zones only, for a contact measured live before
+    /// a recorded track exists.
+    /// </summary>
+    public static LandingDistanceAnalysis? ForTouchdown(RunwayFacility runway, bool secondary, double touchdownMeters, double lateralMeters)
+    {
+        if (!runway.HasValidGeometry || runway.IsWater || !LandingReplayTrack.Finite(touchdownMeters) || !LandingReplayTrack.Finite(lateralMeters)) return null;
+        var thresholdOffset = secondary ? runway.SecondaryThresholdOffsetMeters : runway.PrimaryThresholdOffsetMeters;
+        var result = new LandingDistanceAnalysis
+        {
+            RunwayName = ((secondary ? runway.SecondaryName : runway.PrimaryName) ?? string.Empty).Trim(),
+            AirportIdent = (runway.AirportIdent ?? string.Empty).Trim(),
+            UsesFaa = RunwayMarkingConvention.UsesFaa(runway),
+            RunwayLengthMeters = runway.LengthMeters,
+            RunwayWidthMeters = runway.WidthMeters,
+            ThresholdOffsetMeters = thresholdOffset ?? 0,
+            ThresholdOffsetKnown = thresholdOffset.HasValue,
+            TouchdownMeters = touchdownMeters,
+            TouchdownLateralMeters = lateralMeters,
+        };
+        result.ResolveAim(runway, secondary);
+        result.Zone = result.Classify(touchdownMeters);
+        return result;
+    }
+
     public LandingDistanceZone Classify(double alongMeters) =>
         alongMeters < 0 ? LandingDistanceZone.BeforeThreshold :
         alongMeters < TargetZoneStartMeters ? LandingDistanceZone.ShortOfTarget :

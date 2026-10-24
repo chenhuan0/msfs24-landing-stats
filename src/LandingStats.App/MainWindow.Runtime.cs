@@ -111,6 +111,7 @@ public partial class MainWindow
         await Dispatcher.InvokeAsync(() =>
         {
             if (_isClosed || _historyStopped) return;
+            PresentTouchdownNotice(snapshot.Touchdown);
             var status = snapshot.Status;
             var captureSuppressed = status?.MessageKey == "Recorder.ReplayActive" || status?.MessageKey == "Recorder.ReplayChecking";
             var activeEpisodeChanged = _runtimeActiveEpisode != snapshot.ActiveEpisode;

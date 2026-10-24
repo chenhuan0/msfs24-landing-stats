@@ -1,4 +1,5 @@
 using System.Runtime.Serialization;
+using LandingStats.App.Presentation;
 
 namespace LandingStats.App.Settings;
 
@@ -26,9 +27,22 @@ internal sealed class ApplicationSettings : IExtensibleDataObject
     [DataMember(Name = "integrationApiEnabled", Order = 6)]
     public bool IntegrationApiEnabled { get; set; }
 
+    // A display preference for this computer; it is not cloud-synced.
+    [DataMember(Name = "touchdownCardEnabled", Order = 7)]
+    public bool TouchdownCardEnabled { get; set; } = true;
+
+    // Stored by name; an unknown value from a newer version falls back to the default.
+    [DataMember(Name = "touchdownCardPosition", Order = 8)]
+    public string TouchdownCardPosition { get; set; } = TouchdownCardPositions.Default.ToString();
+
     // DataContractSerializer does not run property initializers for old files.
     [OnDeserializing]
-    private void InitializeDefaults(StreamingContext context) => AutomaticTelemetryUpload = true;
+    private void InitializeDefaults(StreamingContext context)
+    {
+        AutomaticTelemetryUpload = true;
+        TouchdownCardEnabled = true;
+        TouchdownCardPosition = TouchdownCardPositions.Default.ToString();
+    }
 
     public ExtensionDataObject? ExtensionData { get; set; }
 
@@ -40,6 +54,8 @@ internal sealed class ApplicationSettings : IExtensibleDataObject
         GoogleDrivePromptAnswered = GoogleDrivePromptAnswered,
         AutomaticTelemetryUpload = AutomaticTelemetryUpload,
         IntegrationApiEnabled = IntegrationApiEnabled,
+        TouchdownCardEnabled = TouchdownCardEnabled,
+        TouchdownCardPosition = TouchdownCardPosition,
         // Extension data is opaque and never mutated by the application. Keep
         // it on detached save snapshots so future-version options survive.
         ExtensionData = ExtensionData,
@@ -53,6 +69,8 @@ internal sealed class ApplicationSettings : IExtensibleDataObject
         GoogleDrivePromptAnswered = source.GoogleDrivePromptAnswered;
         AutomaticTelemetryUpload = source.AutomaticTelemetryUpload;
         IntegrationApiEnabled = source.IntegrationApiEnabled;
+        TouchdownCardEnabled = source.TouchdownCardEnabled;
+        TouchdownCardPosition = source.TouchdownCardPosition;
         ExtensionData = source.ExtensionData;
     }
 
@@ -64,5 +82,6 @@ internal sealed class ApplicationSettings : IExtensibleDataObject
         }
 
         Language = LocalizationManager.NormalizePreference(Language);
+        TouchdownCardPosition = TouchdownCardPositions.Parse(TouchdownCardPosition).ToString();
     }
 }

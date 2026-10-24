@@ -54,6 +54,8 @@ public partial class MainWindow
         SettingsLanguageRussian.IsEnabled = enabled;
         SettingsTelemetryCheckBox.IsEnabled = enabled;
         SettingsIntegrationApiCheckBox.IsEnabled = enabled;
+        SettingsTouchdownCardCheckBox.IsEnabled = enabled;
+        foreach (var choice in TouchdownCardPositionChoices) choice.IsEnabled = enabled;
         SettingsAutoStartCheckBox.IsEnabled = enabled && _autoStartInitialized && !_autoStartPromptBusy;
         DeclineAutoStartButton.IsEnabled = enabled && !_autoStartPromptBusy;
         EnableAutoStartButton.IsEnabled = enabled && !_autoStartPromptBusy;
