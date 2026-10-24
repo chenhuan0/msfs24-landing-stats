@@ -30,13 +30,13 @@ internal sealed class LandingScoreComponent
 /// A transparent touchdown rating. Component weights follow TouchdownFX's
 /// published split. Each curve scores 100 within normal operation, 60 at the
 /// first published flag level or SOP go-around limit, 20 at the severe level
-/// and 0 at a structural or geometric limit; thresholds without a published
+/// where one is published and 0 at a structural or geometric limit; thresholds without a published
 /// source are marked as this application's own. Scores the selected contact only.
 /// </summary>
 internal sealed class LandingScore
 {
     /// <summary>Bump whenever a weight, curve, cap or bounce rule changes; cached history scores are then recomputed.</summary>
-    internal const int RulesVersion = 1;
+    internal const int RulesVersion = 2;
     internal const double LightMaximumPounds = 12500;
     internal const double RegionalMaximumPounds = 100000;
     internal const double HeavyMinimumPounds = 300000;
@@ -140,7 +140,7 @@ internal sealed class LandingScore
             Add(LandingScoreCriterion.TouchdownZone, distance.TouchdownMeters, touchdownZone,
                 distance.TouchdownMeters < 0 ? 0 : Evaluate(touchdownZone, distance.TouchdownMeters));
             var lateral = Math.Abs(distance.TouchdownLateralMeters);
-            var centerline = CenterlineCurve(distance.RunwayWidthMeters);
+            var centerline = CenterlineCurve(distance.RunwayWidthMeters, result.Category);
             Add(LandingScoreCriterion.Centerline, lateral, centerline, distance.OffRunwayEdge ? 0 : Evaluate(centerline, lateral));
         }
         else
@@ -262,15 +262,31 @@ internal sealed class LandingScore
         };
     }
 
-    internal static (double X, double Score)[] CenterlineCurve(double runwayWidthMeters)
+    /// <summary>
+    /// Main gear track of the most numerous type of each category in the HAW Hamburg aircraft
+    /// database, compiled from manufacturer airport planning documents: Twin Otter, ATR 72,
+    /// 737-800 and 777-300ER.
+    /// </summary>
+    internal static double MainGearTrackMeters(LandingScoreCategory category) => category switch
     {
-        // GAPPRE's recommended SOP goes around when the main gear no longer
-        // straddles the centreline, about 3 m off for a narrow-body; that is the
-        // pass mark. Zero where its outer main wheel, 4.5 m out, would use up
-        // the 4.5 m edge clearance that ICAO runway widths provide; the other
-        // anchors are this application's own.
+        LandingScoreCategory.Light => 3.7,
+        LandingScoreCategory.Regional => 4.1,
+        LandingScoreCategory.Heavy => 10.97,
+        _ => 5.72,
+    };
+
+    internal static (double X, double Score)[] CenterlineCurve(double runwayWidthMeters, LandingScoreCategory category)
+    {
+        // GAPPRE's recommended SOP goes around when all main gear are on one
+        // side of the centreline; the pass mark is where the gear centre
+        // crosses it, half the category's main gear track. Zero where an
+        // A320's outer main wheel, 4.5 m out, would use up the 4.5 m edge
+        // clearance that ICAO runway widths provide. No level in between is
+        // published, so the score falls linearly. The full-marks band, 1 m or
+        // half the pass mark, is this application's own.
+        var straddle = MainGearTrackMeters(category) / 2;
         var zero = Math.Max(8, runwayWidthMeters / 2 - 9);
-        return new[] { (0.0, 100.0), (1.0, 100.0), (3.0, 60.0), (6.0, 20.0), (zero, 0.0) };
+        return new[] { (0.0, 100.0), (Math.Min(1, straddle / 2), 100.0), (straddle, 60.0), (zero, 0.0) };
     }
 
     // No published limit; this application's own. Boeing does not recommend a

@@ -234,7 +234,7 @@ public sealed class LandingScoreView : FrameworkElement
             LandingScoreCriterion.VerticalSpeed => Format("Score.Rule.VerticalSpeedFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
             LandingScoreCriterion.GForce => Format("Score.Rule.GForceFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
             LandingScoreCriterion.TouchdownZone => Format("Score.Rule.TouchdownZoneFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            LandingScoreCriterion.Centerline => Format("Score.Rule.CenterlineFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
+            LandingScoreCriterion.Centerline => Format("Score.Rule.CenterlineFormat", curve[1].X, curve[2].X, curve[3].X),
             LandingScoreCriterion.Crab => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
             LandingScoreCriterion.Bank => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
             _ => Format("Score.Rule.PitchFormat", curve[3].X, curve[4].X, curve[2].X, curve[5].X),

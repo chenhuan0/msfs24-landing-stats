@@ -71,6 +71,16 @@ internal static class LandingScoreRegressionTests
         Near(LandingScore.Evaluate(zone, deepDistance.TouchdownMeters),
             Component(LandingScore.Create(deep, deepTrack, deepDistance), LandingScoreCriterion.TouchdownZone).Score!.Value, 1e-6, "deep landing follows the zone curve");
 
+        var centerline = LandingScore.CenterlineCurve(60, LandingScoreCategory.Airliner);
+        Near(60, LandingScore.Evaluate(centerline, 5.72 / 2), 1e-6, "the airliner pass mark is where a 737-800's main gear stops straddling the centreline");
+        Near(60 * (21 - 7.8) / (21 - 2.86), LandingScore.Evaluate(centerline, 7.8), 1e-6, "past the pass mark the score falls linearly to the edge-clearance limit");
+        Near(100, LandingScore.Evaluate(centerline, 1), 1e-6, "full marks within 1 m");
+        Near(60, LandingScore.Evaluate(LandingScore.CenterlineCurve(60, LandingScoreCategory.Heavy), 10.97 / 2), 1e-6, "a 777's wider main gear moves the pass mark out");
+        var lightCenterline = LandingScore.CenterlineCurve(30, LandingScoreCategory.Light);
+        Check(lightCenterline[1].X < lightCenterline[2].X && lightCenterline[2].X < lightCenterline[3].X, "light-aircraft centreline anchors stay ordered");
+        var offCenter = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: 7.8, reciprocal: false)));
+        Near(60 * (13.5 - 7.8) / (13.5 - 2.86), Component(offCenter, LandingScoreCriterion.Centerline).Score!.Value, .5, "7.8 m off a 45 m runway's centreline");
+
         Check(ideal.BounceCount == 0 && ideal.BounceScore == 100 && ideal.BounceDeduction == 0, "a single contact has no bounce");
 
         var skip = Score(Bounced(0));
