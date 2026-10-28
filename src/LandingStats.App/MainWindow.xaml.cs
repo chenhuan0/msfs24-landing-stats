@@ -187,7 +187,8 @@ public partial class MainWindow : Window
         {
             StartPendingBugReportRetry();
         }
-        var updateCheck = CheckForUpdateAsync();
+        // This fork does not check for updates: the release channel is signed by
+        // upstream and would replace this build with the upstream package.
         if (ShouldRestoreSettingsBeforeOnboarding(_googleDriveTokenStore.HasRefreshToken(), _settingsPersistedAndReadable))
             await _runtimeInitializationTask;
 
@@ -214,7 +215,6 @@ public partial class MainWindow : Window
         _autoStartInitialized = true; _services.Settings.AutoStartInitialized = true;
         ShowGoogleDrivePromptIfNeeded();
         await googleDriveStartupSync;
-        await updateCheck;
     }
 
     private void OnHistorySelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs eventArgs)
