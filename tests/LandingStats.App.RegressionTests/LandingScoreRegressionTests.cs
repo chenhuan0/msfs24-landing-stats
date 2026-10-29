@@ -41,7 +41,24 @@ internal static class LandingScoreRegressionTests
         passMark.BankDegrees = 4;
         var passMarkScore = Score(passMark);
         Near(60, Component(passMarkScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4° bank is CAAC's first flag");
-        Check(LandingScoreView.Grade(passMarkScore.Total!.Value) != "Excellent", "one criterion at its pass mark keeps the total below Excellent");
+        Check(!passMarkScore.Capped, "a criterion at its pass mark does not cap the total");
+        Near(100 - 10 * .4, passMarkScore.Total!.Value, 1e-6, "a criterion at its pass mark only loses its weighted points");
+
+        var belowPass = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
+        belowPass.BankDegrees = 4.5;
+        var belowPassScore = Score(belowPass);
+        Near(50, Component(belowPassScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4.5° bank is below the first flag");
+        Check(belowPassScore.Capped && belowPassScore.Weakest?.Criterion == LandingScoreCriterion.Bank, "a criterion below its pass mark caps the total");
+        Near(50 + LandingScore.WeakestCriterionMargin, belowPassScore.Total!.Value, 1e-6, "the cap is the failing criterion plus the margin");
+
+        var releasing = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
+        releasing.BankDegrees = 4.25;
+        var releasingScore = Score(releasing);
+        Near(55, Component(releasingScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4.25° bank is between the release and the first flag");
+        Near(87.5, releasingScore.Total!.Value, 1e-6, "the cap opens linearly from 75 at 50 to 100 at the first flag");
+        var justBelowPass = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
+        justBelowPass.BankDegrees = 4.001;
+        Near(passMarkScore.Total!.Value, Score(justBelowPass).Total!.Value, .01, "the total has no step at the pass mark");
 
         var light = LandingScore.VerticalSpeedCurve(LandingScoreCategory.Light);
         Near(60, LandingScore.Evaluate(light, 168), 1e-6, "light aircraft scale the 4 ft/s flag to FAR 23.473");
@@ -96,11 +113,14 @@ internal static class LandingScoreRegressionTests
 
         var limitBounce = Score(Bounced(LandingScore.HighBounceFeet));
         Near(60, limitBounce.BounceScore, 1e-3, "a bounce at the FSF 5 ft limit is at the first flag");
-        Check(limitBounce.LimitedByBounce, "the bounce sets the cap of an otherwise ideal landing");
-        Near(60 + LandingScore.WeakestCriterionMargin, limitBounce.Total!.Value, 1e-3, "a 5 ft bounce keeps the total at Good or below");
+
+        var passingBounce = Score(Bounced(4));
+        Check(passingBounce.BounceScore > 60 && !passingBounce.Capped, "a bounce within the light-bounce limit does not cap the total");
+        Near(100 - (100 - passingBounce.BounceScore) / 4, passingBounce.Total!.Value, 1e-6, "a passing bounce only deducts");
 
         var highBounce = Score(Bounced(6));
         Near(20, highBounce.BounceScore, 1e-6, "a bounce from 6 ft is at the severe level");
+        Check(highBounce.LimitedByBounce, "the bounce sets the cap of an otherwise ideal landing");
         Near(20 + LandingScore.WeakestCriterionMargin, highBounce.Total!.Value, 1e-6, "a high bounce caps the total");
 
         var repeated = Score(Bounced(1, 2));
@@ -117,9 +137,9 @@ internal static class LandingScoreRegressionTests
         Near(firmBounceScore.WeightedTotal!.Value - firmBounceScore.BounceDeduction, firmBounceScore.Total!.Value, 1e-6, "the deduction applies below the cap");
 
         var bankedBounce = Bounced(2);
-        bankedBounce.BankDegrees = 4;
+        bankedBounce.BankDegrees = 4.5;
         var cappedBounce = Score(bankedBounce);
-        Near(60 + LandingScore.WeakestCriterionMargin - cappedBounce.BounceDeduction, cappedBounce.Total!.Value, 1e-6,
+        Near(50 + LandingScore.WeakestCriterionMargin - cappedBounce.BounceDeduction, cappedBounce.Total!.Value, 1e-6,
             "a bounce still deducts when another criterion already caps the total");
 
         var unknown = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));

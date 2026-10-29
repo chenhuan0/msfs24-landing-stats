@@ -125,7 +125,7 @@ public sealed class LandingScoreView : FrameworkElement
         if (score.Capped && score.LimitingScore is double limitingScore && score.Weakest is { } weakest)
             y = DrawWrapped(context, Format("Score.CappedFormat",
                 Text("Score.Criterion." + (score.LimitedByBounce ? "Bounce" : weakest.Criterion.ToString())), limitingScore,
-                LandingScore.WeakestCriterionMargin, score.UncappedTotal!.Value), AmberBrush, 11, y) + 6;
+                LandingScore.CapFor(limitingScore), score.UncappedTotal!.Value, LandingScore.CapBelowScore), AmberBrush, 11, y) + 6;
         if (record.ContactCount > 1)
             y = DrawWrapped(context, Format("Score.ContactFormat", record.ContactCount), AmberBrush, 11, y) + 6;
         DrawWrapped(context, Text("Score.Basis"), SubtleBrush, 10, y + 6);

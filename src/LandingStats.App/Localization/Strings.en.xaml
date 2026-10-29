@@ -423,7 +423,7 @@
     <system:String x:Key="Score.CategorySpeedFormat">{0} · from contact airspeed {1:0} kt</system:String>
     <system:String x:Key="Score.CriteriaFormat">{0} of {1} criteria scored ({2:0} of 100 points)</system:String>
     <system:String x:Key="Score.ContactFormat">Bounced landing with {0} contacts: only the first is scored, the rest count as bounces</system:String>
-    <system:String x:Key="Score.CappedFormat">Limited by {0} at {1:0}: the total is at most the weakest criterion + {2:0} ({3:0} before the cap)</system:String>
+    <system:String x:Key="Score.CappedFormat">Limited by {0} at {1:0}: below {4:0}, the total is capped at {2:0} ({3:0} before the cap)</system:String>
     <system:String x:Key="Score.BounceContactFormat">Bounce: contact {0} of {1}. Later contacts are recorded as bounces and not scored. Select the first contact for the landing score, which includes the bounce deduction.</system:String>
     <system:String x:Key="Score.BounceContactShort">Bounce</system:String>
     <system:String x:Key="Score.Criterion.Bounce">Bounce</system:String>

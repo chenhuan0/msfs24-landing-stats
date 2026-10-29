@@ -36,15 +36,25 @@ internal sealed class LandingScoreComponent
 internal sealed class LandingScore
 {
     /// <summary>Bump whenever a weight, curve, cap or bounce rule changes; cached history scores are then recomputed.</summary>
-    internal const int RulesVersion = 2;
+    internal const int RulesVersion = 3;
     internal const double LightMaximumPounds = 12500;
     internal const double RegionalMaximumPounds = 100000;
     internal const double HeavyMinimumPounds = 300000;
     internal const double TouchdownZoneOverrunMeters = 300;
     internal const double TouchdownZoneSevereMeters = 150;
     internal const double CrabSampleSeconds = 0.5;
-    /// <summary>The total may exceed the weakest criterion by at most this many points.</summary>
+    /// <summary>A criterion or bounce scoring below this, the first flag level, caps the total; a pass does not.</summary>
+    internal const double CapBelowScore = 60;
+    /// <summary>Up to <see cref="CapReleaseScore"/>, a capping score limits the total to itself plus this many points.</summary>
     internal const double WeakestCriterionMargin = 25;
+    /// <summary>From this score the cap opens linearly to 100 at <see cref="CapBelowScore"/>, so it has no step.</summary>
+    internal const double CapReleaseScore = 50;
+    /// <summary>
+    /// Highest total over the capping score. The margin and the release between 50 and the
+    /// first flag are this application's own.
+    /// </summary>
+    internal static readonly (double X, double Score)[] CapCurve =
+        { (0, WeakestCriterionMargin), (CapReleaseScore, CapReleaseScore + WeakestCriterionMargin), (CapBelowScore, 100) };
     /// <summary>FSF ALAR Briefing Note 6.4 continues the landing after a bounce up to about 5 ft and goes around above it.</summary>
     internal const double HighBounceFeet = 5;
     /// <summary>
@@ -90,18 +100,18 @@ internal sealed class LandingScore
     public double BounceDeduction => (100 - BounceScore) * BounceWeight / 100;
     /// <summary>Weighted total less the bounce deduction, before any cap.</summary>
     public double? UncappedTotal => WeightedTotal - BounceDeduction;
-    /// <summary>Weighted total capped at the weakest criterion plus <see cref="WeakestCriterionMargin"/>.</summary>
+    /// <summary>Weighted total capped by the weakest criterion; see <see cref="CapFor"/>.</summary>
     private double? CriteriaTotal => WeightedTotal is double weighted && Weakest?.Score is double weakest
-        ? Math.Min(weighted, weakest + WeakestCriterionMargin) : null;
+        ? Math.Min(weighted, CapFor(weakest)) : null;
     /// <summary>
     /// The capped criteria total less the bounce deduction, so a bounce always costs points,
-    /// and at most the bounce score plus <see cref="WeakestCriterionMargin"/>.
+    /// and also capped by the bounce score.
     /// </summary>
     public double? Total => CriteriaTotal is double criteria
-        ? Math.Max(0, Math.Min(criteria - BounceDeduction, BounceScore + WeakestCriterionMargin)) : null;
+        ? Math.Max(0, Math.Min(criteria - BounceDeduction, CapFor(BounceScore))) : null;
     public bool Capped => UncappedTotal is double uncapped && Total is double total && total < uncapped;
     /// <summary>True when the bounce, not a weighted criterion, sets the cap.</summary>
-    public bool LimitedByBounce => CriteriaTotal is double criteria && BounceScore + WeakestCriterionMargin < criteria - BounceDeduction;
+    public bool LimitedByBounce => CriteriaTotal is double criteria && CapFor(BounceScore) < criteria - BounceDeduction;
     public double? LimitingScore => LimitedByBounce ? BounceScore : Weakest?.Score;
     /// <summary>Signed crab for display: positive when the nose points right of the ground track.</summary>
     public double? CrabSignedDegrees { get; private set; }
@@ -358,6 +368,9 @@ internal sealed class LandingScore
         var crab = (contact.HeadingDegrees - groundTrack + 540) % 360 - 180;
         return Finite(crab) ? crab : null;
     }
+
+    /// <summary>The highest total a score allows on <see cref="CapCurve"/>; a passing score sets no limit.</summary>
+    internal static double CapFor(double score) => score < CapBelowScore ? Evaluate(CapCurve, score) : double.PositiveInfinity;
 
     private static bool Finite(double value) => !double.IsNaN(value) && !double.IsInfinity(value);
 }

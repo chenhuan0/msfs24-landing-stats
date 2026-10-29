@@ -423,7 +423,7 @@
     <system:String x:Key="Score.CategorySpeedFormat">{0} · по скорости касания {1:0} уз</system:String>
     <system:String x:Key="Score.CriteriaFormat">Оценено критериев: {0} из {1} ({2:0} из 100 баллов)</system:String>
     <system:String x:Key="Score.ContactFormat">Посадка с отскоком, касаний: {0}. Оценивается только первое, остальные считаются отскоками</system:String>
-    <system:String x:Key="Score.CappedFormat">Ограничено критерием «{0}» ({1:0}): итог не выше самого слабого критерия + {2:0} (до ограничения {3:0})</system:String>
+    <system:String x:Key="Score.CappedFormat">Ограничено критерием «{0}» ({1:0}): при оценке ниже {4:0} итог не выше {2:0} (до ограничения {3:0})</system:String>
     <system:String x:Key="Score.BounceContactFormat">Отскок: касание {0} из {1}. Последующие касания записываются как отскоки и не оцениваются. Выберите первое касание, чтобы увидеть оценку посадки с вычетом за отскок.</system:String>
     <system:String x:Key="Score.BounceContactShort">Отскок</system:String>
     <system:String x:Key="Score.Criterion.Bounce">Отскок</system:String>
