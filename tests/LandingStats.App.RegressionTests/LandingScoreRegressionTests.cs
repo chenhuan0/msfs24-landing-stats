@@ -7,152 +7,124 @@ using LandingStats.App.Presentation;
 
 namespace LandingStats.App.RegressionTests;
 
+/// <summary>Expected values follow the TouchdownFX 2.1.7 scorecard formula.</summary>
 internal static class LandingScoreRegressionTests
 {
     public static void RunAll()
     {
-        var ideal = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false)));
-        Check(ideal.Category == LandingScoreCategory.Airliner && ideal.CategoryFromWeight, "landing weight selects the airliner category");
+        var ideal = Score(Airliner(Ideal()));
+        Check(ideal.Category == LandingScoreCategory.Airliner, "contact airspeed selects the airliner category");
         Check(ideal.Components.Count == 7 && Math.Abs(ideal.Components.Sum(component => component.Weight) - 100) < 1e-9, "seven criteria share 100 points");
-        Check(ideal.Components.All(component => component.Score == 100), "an on-target, aligned, gentle contact scores every criterion fully");
-        Near(100, ideal.Total!.Value, 1e-6, "ideal total");
+        Check(ideal.Components.All(component => component.Score == 100 && component.Points == component.Weight),
+            "an on-target, aligned, gentle contact scores every criterion fully");
+        Check(ideal.Total == 100 && ideal.Penalties.Count == 0, "ideal total without penalties");
         Near(0, ideal.CrabSignedDegrees!.Value, .2, "no crab when the nose follows the ground track");
 
-        Check(!ideal.Capped, "an ideal contact is not capped");
-
-        var firm = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        firm.InertialFpm = 480;
+        var firm = Airliner(Ideal());
+        firm.InertialFpm = 277;
+        firm.PeakG150Milliseconds = 1.31;
         var firmScore = Score(firm);
-        Near(10, Component(firmScore, LandingScoreCriterion.VerticalSpeed).Score!.Value, 1e-6, "480 fpm (8 ft/s) airliner vertical-speed score");
-        Near(100 - 30 * (1 - .1), firmScore.WeightedTotal!.Value, 1e-6, "vertical speed carries 30 points");
-        Check(firmScore.Capped && firmScore.Weakest?.Criterion == LandingScoreCriterion.VerticalSpeed, "the weakest criterion caps the total");
-        Near(10 + LandingScore.WeakestCriterionMargin, firmScore.Total!.Value, 1e-6, "total is at most the weakest criterion plus the margin");
+        Near(100 * (1 - 97.0 / 420), Component(firmScore, LandingScoreCriterion.VerticalSpeed).Score!.Value, 1e-6,
+            "airliner vertical speed falls linearly from 180 to 600 fpm");
+        Near(100 * (1 - .11 / .3), Component(firmScore, LandingScoreCriterion.GForce).Score!.Value, 1e-6, "peak G falls linearly from 1.2 to 1.5 G");
+        Check(Component(firmScore, LandingScoreCriterion.VerticalSpeed).Points == 23 && Component(firmScore, LandingScoreCriterion.GForce).Points == 9,
+            "points are rounded down");
+        Check(firmScore.Total == 87, "the total sums the whole points");
 
-        // Above Boeing's 4 ft/s crew-report level, with a matching impact.
-        var heavyHanded = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        heavyHanded.InertialFpm = 277;
-        heavyHanded.PeakG150Milliseconds = 1.31;
-        var heavyHandedScore = Score(heavyHanded);
-        Near(60 - 40 * 37.0 / 120, Component(heavyHandedScore, LandingScoreCriterion.VerticalSpeed).Score!.Value, 1e-6, "277 fpm scores below the 4 ft/s flag");
-        Near(78, Component(heavyHandedScore, LandingScoreCriterion.GForce).Score!.Value, 1e-6, "1.31 G between SMOOTH and the first FDM event");
-        Check(heavyHandedScore.Total < 80, "a landing above the hard-landing report level is not graded Good");
+        foreach (var (airspeed, expected) in new[]
+        {
+            (60.0, LandingScoreCategory.Light), (70.0, LandingScoreCategory.Turboprop), (109.9, LandingScoreCategory.Turboprop),
+            (110.0, LandingScoreCategory.Airliner), (155.0, LandingScoreCategory.Heavy), (0.0, LandingScoreCategory.Airliner),
+            (double.NaN, LandingScoreCategory.Airliner),
+        })
+            Check(LandingScore.CategoryFor(airspeed) == expected, $"{airspeed} kt is {expected}");
+        var heavyWeight = Airliner(Ideal());
+        heavyWeight.WeightPounds = 400000;
+        Check(Score(heavyWeight).Category == LandingScoreCategory.Airliner, "landing weight does not change the category");
+        Near(50, LandingScore.Evaluate(LandingScore.VerticalSpeedCurve(LandingScoreCategory.Light), 240), 1e-6, "light: full to 80, zero at 400 fpm");
+        Near(0, LandingScore.Evaluate(LandingScore.VerticalSpeedCurve(LandingScoreCategory.Turboprop), 500), 1e-6, "turboprop: zero at 500 fpm");
+        Near(100, LandingScore.Evaluate(LandingScore.VerticalSpeedCurve(LandingScoreCategory.Heavy), 240), 1e-6, "heavy: full to 240 fpm");
 
-        var passMark = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        passMark.BankDegrees = 4;
-        var passMarkScore = Score(passMark);
-        Near(60, Component(passMarkScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4° bank is CAAC's first flag");
-        Check(!passMarkScore.Capped, "a criterion at its pass mark does not cap the total");
-        Near(100 - 10 * .4, passMarkScore.Total!.Value, 1e-6, "a criterion at its pass mark only loses its weighted points");
-
-        var belowPass = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        belowPass.BankDegrees = 4.5;
-        var belowPassScore = Score(belowPass);
-        Near(50, Component(belowPassScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4.5° bank is below the first flag");
-        Check(belowPassScore.Capped && belowPassScore.Weakest?.Criterion == LandingScoreCriterion.Bank, "a criterion below its pass mark caps the total");
-        Near(50 + LandingScore.WeakestCriterionMargin, belowPassScore.Total!.Value, 1e-6, "the cap is the failing criterion plus the margin");
-
-        var releasing = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        releasing.BankDegrees = 4.25;
-        var releasingScore = Score(releasing);
-        Near(55, Component(releasingScore, LandingScoreCriterion.Bank).Score!.Value, 1e-6, "4.25° bank is between the release and the first flag");
-        Near(87.5, releasingScore.Total!.Value, 1e-6, "the cap opens linearly from 75 at 50 to 100 at the first flag");
-        var justBelowPass = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        justBelowPass.BankDegrees = 4.001;
-        Near(passMarkScore.Total!.Value, Score(justBelowPass).Total!.Value, .01, "the total has no step at the pass mark");
-
-        var light = LandingScore.VerticalSpeedCurve(LandingScoreCategory.Light);
-        Near(60, LandingScore.Evaluate(light, 168), 1e-6, "light aircraft scale the 4 ft/s flag to FAR 23.473");
-        Near(0, LandingScore.Evaluate(light, 420), 1e-6, "light aircraft reach zero at 7 ft/s");
-
-        var crabbed = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false, headingOffset: 5)));
-        Near(5, crabbed.CrabSignedDegrees!.Value, .2, "nose right of the ground track is positive crab");
-        Near(20, Component(crabbed, LandingScoreCriterion.Crab).Score!.Value, 5, "5° crab score");
-
-        var gForce = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        gForce.PeakG150Milliseconds = 1.5;
-        gForce.PitchDegrees = 1;
-        var gForceScore = Score(gForce);
-        Near(50, Component(gForceScore, LandingScoreCriterion.GForce).Score!.Value, 1e-6, "1.5 G between the first FDM event and CAAC severe");
-        Near(0, Component(gForceScore, LandingScoreCriterion.Pitch).Score!.Value, 1e-6, "1° nose-down airliner pitch");
+        var hard = Airliner(Ideal());
+        hard.PeakG150Milliseconds = 2.0;
+        var hardScore = Score(hard);
+        Check(Component(hardScore, LandingScoreCriterion.GForce).Score == 0, "2 G scores no peak-G points");
+        Check(hardScore.Penalties.Single().Kind == LandingScorePenaltyKind.GForce, "peak G above 1.5 G is penalised");
+        Near(.7, hardScore.Multiplier, 1e-9, "the G penalty falls from 1 at 1.5 G to 0.4 at 2.5 G");
+        Check(hardScore.Total == Math.Floor(85 * .7), "the penalty multiplies the base score");
 
         var deep = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 700, lateral: .5, reciprocal: false));
         var deepTrack = LandingDistanceRegressionTests.Track(deep);
         var deepDistance = LandingDistanceAnalysis.Create(deep, deepTrack, new[] { 0.0 })!;
-        var zone = LandingScore.TouchdownZoneCurve(deepDistance);
-        var zoneEnd = deepDistance.TouchdownZoneEndMeters;
-        Near(deepDistance.TargetZoneEndMeters, zone[2].X, 1e-6, "full marks span the target zone on a long runway");
-        Check(zone[3] == (zoneEnd, 60.0), "touching down at the end of the touchdown zone is the pass mark");
-        Check(zone[4] == (zoneEnd + LandingScore.TouchdownZoneSevereMeters, 20.0), "scores fall quickly beyond the touchdown zone");
-        Near(100 - 40 * (700 - zone[2].X) / (zoneEnd - zone[2].X), Component(LandingScore.Create(deep, deepTrack, deepDistance),
-            LandingScoreCriterion.TouchdownZone).Score!.Value, 1, "700 m sits between the target zone and the pass mark");
-        Near(LandingScore.Evaluate(zone, deepDistance.TouchdownMeters),
-            Component(LandingScore.Create(deep, deepTrack, deepDistance), LandingScoreCriterion.TouchdownZone).Score!.Value, 1e-6, "deep landing follows the zone curve");
+        Check(LandingScore.TouchdownZoneCurve(deepDistance, LandingScoreCategory.Airliner)
+                .SequenceEqual(new[] { (0.0, 0.0), (300.0, 100.0), (500.0, 100.0), (900.0, 0.0) }),
+            "3,000 m runway: aiming point 400 m, full within 100 m, zero 500 m past it");
+        Check(LandingScore.TouchdownZoneCurve(deepDistance, LandingScoreCategory.Light)
+                .SequenceEqual(new[] { (0.0, 0.0), (250.0, 100.0), (550.0, 100.0), (800.0, 0.0) }),
+            "light aircraft get 150 m either side and reach zero 400 m past the aiming point");
+        Near(50, Component(LandingScore.Create(deep, deepTrack, deepDistance), LandingScoreCriterion.TouchdownZone).Score!.Value, 1,
+            "700 m is halfway down the decline");
+        var displacedRunway = deep.RunwayGeometry!;
+        displacedRunway.PrimaryThresholdOffsetMeters = 800;
+        var displaced = LandingDistanceAnalysis.ForTouchdown(displacedRunway, false, 300, 0)!;
+        Check(LandingScore.TouchdownZoneCurve(displaced, LandingScoreCategory.Airliner)
+                .SequenceEqual(new[] { (0.0, 0.0), (200.0, 100.0), (400.0, 100.0), (700.0, 0.0) }),
+            "a 2,200 m landing distance aims at 300 m and the runway midpoint ends the zone");
+        displacedRunway.PrimaryThresholdOffsetMeters = 0;
+        displacedRunway.LengthMeters = 1000;
+        var shortRunway = LandingDistanceAnalysis.ForTouchdown(displacedRunway, false, 300, 0)!;
+        Check(LandingScore.TouchdownZoneCurve(shortRunway, LandingScoreCategory.Airliner)
+                .SequenceEqual(new[] { (0.0, 0.0), (150.0, 100.0), (350.0, 100.0), (500.0, 0.0) }),
+            "a 1,000 m runway aims at 250 m");
 
-        var centerline = LandingScore.CenterlineCurve(60, LandingScoreCategory.Airliner);
-        Near(60, LandingScore.Evaluate(centerline, 5.72 / 2), 1e-6, "the airliner pass mark is where a 737-800's main gear stops straddling the centreline");
-        Near(60 * (21 - 7.8) / (21 - 2.86), LandingScore.Evaluate(centerline, 7.8), 1e-6, "past the pass mark the score falls linearly to the edge-clearance limit");
-        Near(100, LandingScore.Evaluate(centerline, 1), 1e-6, "full marks within 1 m");
-        Near(60, LandingScore.Evaluate(LandingScore.CenterlineCurve(60, LandingScoreCategory.Heavy), 10.97 / 2), 1e-6, "a 777's wider main gear moves the pass mark out");
-        var lightCenterline = LandingScore.CenterlineCurve(30, LandingScoreCategory.Light);
-        Check(lightCenterline[1].X < lightCenterline[2].X && lightCenterline[2].X < lightCenterline[3].X, "light-aircraft centreline anchors stay ordered");
-        var offCenter = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: 7.8, reciprocal: false)));
-        Near(60 * (13.5 - 7.8) / (13.5 - 2.86), Component(offCenter, LandingScoreCriterion.Centerline).Score!.Value, .5, "7.8 m off a 45 m runway's centreline");
+        var late = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 2100, lateral: .5, reciprocal: false)));
+        Check(Component(late, LandingScoreCriterion.TouchdownZone).Points == 0, "a late touchdown scores no touchdown-zone points");
+        Check(late.Penalties.Single().Kind == LandingScorePenaltyKind.LateTouchdown, "a touchdown past 60% of the runway is penalised");
+        Near(.7, late.Multiplier, .01, "70% of the runway is halfway to the 0.4 floor at 80%");
 
-        Check(ideal.BounceCount == 0 && ideal.BounceScore == 100 && ideal.BounceDeduction == 0, "a single contact has no bounce");
+        Near(100 * (1 - 6.8 / 19), LandingScore.Evaluate(LandingScore.CenterlineCurve, 7.8), 1e-6, "centreline: full to 1 m, zero at 20 m");
+        var wide = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: 22, reciprocal: false)));
+        Check(Component(wide, LandingScoreCriterion.Centerline).Score == 0, "22 m off the centreline scores nothing");
+        Check(wide.Penalties.Single().Kind == LandingScorePenaltyKind.Centerline, "more than 20 m off the centreline is penalised");
+        Near(.95, wide.Multiplier, .01, "the centreline penalty falls to 0.5 at 40 m");
 
-        var skip = Score(Bounced(0));
-        Check(skip.BounceCount == 1, "one later contact is one bounce");
-        Near(92, skip.BounceScore, 1e-6, "a skip without height gain is still a bounce event");
-        Near(2, skip.BounceDeduction, 1e-6, "a skip deducts only a little");
-        Near(98, skip.Total!.Value, 1e-6, "a skip leaves an ideal landing Excellent");
+        var crabbed = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false, headingOffset: 2.75)));
+        Near(2.75, crabbed.CrabSignedDegrees!.Value, .2, "nose right of the ground track is positive crab");
+        Near(50, Component(crabbed, LandingScoreCriterion.Crab).Score!.Value, 5, "crab: full to 0.5°, zero at 5°");
+        var skidded = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false, headingOffset: 8)));
+        Check(skidded.Penalties.Single().Kind == LandingScorePenaltyKind.Crab, "crab above 5° is penalised");
+        Near(.82, skidded.Multiplier, .02, "the crab penalty falls to 0.4 at 15°");
 
-        var lightBounce = Score(Bounced(2));
-        Near(2, lightBounce.BounceHeightsFeet[0]!.Value, .01, "bounce height above the first contact");
-        Near(92 - 32 * 2.0 / 5, lightBounce.BounceScore, .05, "the bounce score falls with height up to 5 ft");
-        Near(100 - (100 - lightBounce.BounceScore) / 4, lightBounce.Total!.Value, 1e-6, "a quarter of the shortfall is deducted");
+        Near(50, Component(Score(Banked(3)), LandingScoreCriterion.Bank).Score!.Value, 1e-6, "bank: full to 1°, zero at 5°");
+        Check(Score(Banked(-3, windKnots: 10)).Components.Single(component => component.Criterion == LandingScoreCriterion.Bank).Score == 100,
+            "banking right into a 10 kt crosswind from the right is allowed 3°");
+        Near(50, Component(Score(Banked(3, windKnots: 10)), LandingScoreCriterion.Bank).Score!.Value, 1e-6, "banking away from the crosswind is not");
+        Near(50, Component(Score(Banked(-3, windKnots: 4)), LandingScoreCriterion.Bank).Score!.Value, 1e-6, "a 4 kt crosswind earns no allowance");
+        var steep = Score(Banked(7));
+        Check(steep.Penalties.Single().Kind == LandingScorePenaltyKind.Bank && Math.Abs(steep.Multiplier - .8) < 1e-9 && steep.Total == 72,
+            "bank above 5° is penalised down to 0.5 at 10°");
 
-        var limitBounce = Score(Bounced(LandingScore.HighBounceFeet));
-        Near(60, limitBounce.BounceScore, 1e-3, "a bounce at the FSF 5 ft limit is at the first flag");
+        var pitch = LandingScore.PitchCurve(LandingScoreCategory.Airliner);
+        Near(100, LandingScore.Evaluate(pitch, 7), 1e-6, "airliner pitch: full from 3° to 7°");
+        Near(100 - 100 / 6.0, LandingScore.Evaluate(pitch, 8), 1e-6, "a sixth per degree above the band");
+        Near(62.5, LandingScore.Evaluate(pitch, 0), 1e-6, "an eighth per degree below 3°");
+        Near(100 - 100 / 6.0, LandingScore.Evaluate(LandingScore.PitchCurve(LandingScoreCategory.Light), 6), 1e-6, "light pitch band ends at 5°");
+        var noseDown = Airliner(Ideal());
+        noseDown.PitchDegrees = 1;
+        Near(50, Component(Score(noseDown), LandingScoreCriterion.Pitch).Score!.Value, 1e-6, "1° nose down");
 
-        var passingBounce = Score(Bounced(4));
-        Check(passingBounce.BounceScore > 60 && !passingBounce.Capped, "a bounce within the light-bounce limit does not cap the total");
-        Near(100 - (100 - passingBounce.BounceScore) / 4, passingBounce.Total!.Value, 1e-6, "a passing bounce only deducts");
+        var noRunway = Airliner(Ideal());
+        noRunway.RunwayGeometry = null;
+        var partial = LandingScore.Create(noRunway, LandingDistanceRegressionTests.Track(noRunway), null);
+        Check(Component(partial, LandingScoreCriterion.TouchdownZone) is { Value: null, Points: 0 } &&
+              Component(partial, LandingScoreCriterion.Centerline) is { Value: null, Points: 10 },
+            "without a runway, TouchdownFX awards no touchdown-zone points and full centreline points");
+        Check(partial.Total == 85, "the other criteria still count");
+        var noVerticalSpeed = Airliner(Ideal());
+        noVerticalSpeed.InertialFpm = double.NaN;
+        Check(Score(noVerticalSpeed).Total == null, "no score without a vertical speed");
 
-        var highBounce = Score(Bounced(6));
-        Near(20, highBounce.BounceScore, 1e-6, "a bounce from 6 ft is at the severe level");
-        Check(highBounce.LimitedByBounce, "the bounce sets the cap of an otherwise ideal landing");
-        Near(20 + LandingScore.WeakestCriterionMargin, highBounce.Total!.Value, 1e-6, "a high bounce caps the total");
-
-        var repeated = Score(Bounced(1, 2));
-        Check(repeated.BounceCount == 2, "each later contact is a bounce");
-        Near(1, repeated.BounceHeightsFeet[0]!.Value, .01, "the first bounce is measured on its own");
-        Near(2, repeated.BounceHeightsFeet[1]!.Value, .01, "the second bounce is measured on its own");
-        Near(Score(Bounced(1)).BounceDeduction + Score(Bounced(2)).BounceDeduction, repeated.BounceDeduction, 1e-6, "each bounce deducts separately");
-        Near(100 - (100 - Score(Bounced(1)).BounceScore) - (100 - Score(Bounced(2)).BounceScore), repeated.BounceScore, 1e-6,
-            "the bounce shortfalls add up for the cap");
-
-        var firmBounce = Bounced(2);
-        firmBounce.InertialFpm = 200;
-        var firmBounceScore = Score(firmBounce);
-        Near(firmBounceScore.WeightedTotal!.Value - firmBounceScore.BounceDeduction, firmBounceScore.Total!.Value, 1e-6, "the deduction applies below the cap");
-
-        var bankedBounce = Bounced(2);
-        bankedBounce.BankDegrees = 4.5;
-        var cappedBounce = Score(bankedBounce);
-        Near(50 + LandingScore.WeakestCriterionMargin - cappedBounce.BounceDeduction, cappedBounce.Total!.Value, 1e-6,
-            "a bounce still deducts when another criterion already caps the total");
-
-        var unknown = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        unknown.ContactCount = 2;
-        var unknownScore = Score(unknown);
-        Check(unknownScore.BounceHeightsFeet[0] == null && unknownScore.BounceScore == LandingScore.UnmeasuredBounceScore,
-            "a bounce beyond the stored series scores at the light-bounce limit");
-        foreach (var clocked in new[] { true, false })
-        {
-            var measured = Score(unknown, unknown, SecondContact(unknown, heightFeet: 3, gapSeconds: 1, clocked));
-            Near(3, measured.BounceHeightsFeet[0]!.Value, .01, $"the contact ending a bounce measures it ({(clocked ? "clocked" : "legacy")})");
-        }
-
+        Check(Score(Bounced(6)).Total == ideal.Total, "bounces do not change the score of the first contact");
         var later = Bounced(2);
         later.ContactNumber = 2;
         var laterView = new LandingScoreView();
@@ -160,42 +132,34 @@ internal static class LandingScoreRegressionTests
         Check(laterView.IsBounceContact && laterView.Score == null, "later contacts are recorded as bounces and not scored");
         LandingDistanceRegressionTests.Render(laterView, 1280, 520);
 
-        var longLanding = Score(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 1100, lateral: .5, reciprocal: false)));
-        var tdz = Component(longLanding, LandingScoreCriterion.TouchdownZone).Score!.Value;
-        Check(tdz < 20 && tdz > 0, "a landing beyond the touchdown zone falls below the severe level");
-
-        foreach (var (weight, airspeed, expected, fromWeight) in new[]
+        foreach (var (total, grade) in new[]
         {
-            (2500.0, 70.0, LandingScoreCategory.Light, true), (50000.0, 110.0, LandingScoreCategory.Regional, true),
-            (400000.0, 150.0, LandingScoreCategory.Heavy, true), (0.0, 70.0, LandingScoreCategory.Light, false),
-            (0.0, 160.0, LandingScoreCategory.Heavy, false),
+            (100.0, "Excellent"), (90.0, "Excellent"), (89.0, "Good"), (75.0, "Good"), (74.0, "Acceptable"), (60.0, "Acceptable"),
+            (59.0, "BelowAverage"), (40.0, "BelowAverage"), (39.0, "Poor"), (20.0, "Poor"), (19.0, "Dangerous"), (0.0, "Dangerous"),
         })
-        {
-            var record = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-            record.WeightPounds = weight; record.AirspeedKnots = airspeed;
-            var category = Score(record);
-            Check(category.Category == expected && category.CategoryFromWeight == fromWeight, $"category {expected} from {(fromWeight ? "weight" : "airspeed")}");
-        }
-
-        var noRunway = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
-        noRunway.RunwayGeometry = null;
-        noRunway.InertialFpm = 480;
-        var partial = LandingScore.Create(noRunway, LandingDistanceRegressionTests.Track(noRunway), null);
-        Check(Component(partial, LandingScoreCriterion.TouchdownZone).Score == null &&
-              Component(partial, LandingScoreCriterion.Centerline).Score == null, "runway criteria are unavailable without geometry");
-        Near(75, partial.AvailableWeight, 1e-9, "available weight excludes runway criteria");
-        Near((100 - 30 * (1 - .1) - 25) / 75 * 100, partial.WeightedTotal!.Value, 1e-6, "remaining weights are rescaled to 100");
-        Near(10 + LandingScore.WeakestCriterionMargin, partial.Total!.Value, 1e-6, "the cap applies after rescaling");
+            Check(LandingScoreView.Grade(total) == grade, $"{total} is {grade}");
 
         var view = new LandingScoreView();
-        view.SetRecord(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 700, lateral: 3, reciprocal: false, headingOffset: 2)));
-        Check(view.Score?.Total != null, "view prepares the score");
+        view.SetRecord(Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 2100, lateral: 3, reciprocal: false, headingOffset: 7)));
+        Check(view.Score?.Total != null && view.Score.Penalties.Count == 2, "view prepares the score with its penalties");
         var bitmap = LandingDistanceRegressionTests.Render(view, 1280, 520);
         var preview = Environment.GetEnvironmentVariable("MSFSLS_DISTANCE_PREVIEW");
         if (!string.IsNullOrWhiteSpace(preview)) LandingDistanceRegressionTests.Save(bitmap, Path.Combine(preview, "score-synthetic.png"));
         var empty = new LandingScoreView();
         empty.SetRecord(new LandingRecord());
         LandingDistanceRegressionTests.Render(empty, 800, 400);
+    }
+
+    private static LandingRecord Ideal() => LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false);
+
+    /// <summary>An ideal contact on runway 09 with the given MSFS bank and an optional wind from the south, the right of the landing direction.</summary>
+    private static LandingRecord Banked(double bankDegrees, double windKnots = 0)
+    {
+        var record = Airliner(Ideal());
+        record.BankDegrees = bankDegrees;
+        record.WindSpeedKnotsAtContact = windKnots;
+        record.WindDirectionDegreesAtContact = 180;
+        return record;
     }
 
     internal static LandingRecord Airliner(LandingRecord record)
@@ -212,7 +176,7 @@ internal static class LandingScoreRegressionTests
     /// <summary>An ideal first contact that leaves the ground for one second per bounce, every other second from 1 s, peaking at each height.</summary>
     internal static LandingRecord Bounced(params double[] heightsFeet)
     {
-        var record = Airliner(LandingDistanceRegressionTests.Record("09", touchdown: 450, lateral: .5, reciprocal: false));
+        var record = Airliner(Ideal());
         record.ContactCount = heightsFeet.Length + 1;
         for (var index = 0; index < heightsFeet.Length; index++)
         {
@@ -247,10 +211,10 @@ internal static class LandingScoreRegressionTests
         return record;
     }
 
-    private static LandingScore Score(LandingRecord record, params LandingRecord[] episode)
+    private static LandingScore Score(LandingRecord record)
     {
         var track = LandingDistanceRegressionTests.Track(record);
-        return LandingScore.Create(record, track, LandingDistanceAnalysis.Create(record, track, new[] { 0.0 }), episode);
+        return LandingScore.Create(record, track, LandingDistanceAnalysis.Create(record, track, new[] { 0.0 }));
     }
 
     private static LandingScoreComponent Component(LandingScore score, LandingScoreCriterion criterion) =>

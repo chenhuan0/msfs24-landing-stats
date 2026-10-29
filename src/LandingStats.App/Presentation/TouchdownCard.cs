@@ -47,7 +47,7 @@ internal sealed class TouchdownCard
 
     public static TouchdownCard Create(TouchdownNoticeEventArgs readings)
     {
-        var category = LandingScore.CategoryFor(readings.WeightPounds, readings.AirspeedKnots, out _);
+        var category = LandingScore.CategoryFor(readings.AirspeedKnots);
         var culture = CultureInfo.CurrentCulture;
         var meters = LocalizationManager.Text("Replay.Meters");
         var metrics = new List<TouchdownCardMetric>(4);
@@ -71,10 +71,10 @@ internal sealed class TouchdownCard
             var side = lateral < .05 ? string.Empty
                 : " " + LocalizationManager.Text(distance.TouchdownLateralMeters > 0 ? "Replay.RightShort" : "Replay.LeftShort");
             metrics.Add(new TouchdownCardMetric(Text("TouchdownCard.Centerline"), lateral.ToString("0.0", culture), meters + side,
-                distance.OffRunwayEdge ? 0 : LandingScore.Evaluate(LandingScore.CenterlineCurve(distance.RunwayWidthMeters, category), lateral)));
+                LandingScore.Evaluate(LandingScore.CenterlineCurve, lateral)));
             var along = distance.TouchdownMeters;
             metrics.Add(new TouchdownCardMetric(Text("TouchdownCard.FromThreshold"), along.ToString("#,0;−#,0;0", culture), meters,
-                along < 0 ? 0 : LandingScore.Evaluate(LandingScore.TouchdownZoneCurve(distance), along)));
+                along < 0 ? 0 : LandingScore.Evaluate(LandingScore.TouchdownZoneCurve(distance, category), along)));
         }
         else
         {

@@ -66,6 +66,8 @@ internal sealed class LandingDistanceAnalysis
     public bool UsesFaa { get; private set; }
     public double RunwayLengthMeters { get; private set; }
     public double RunwayWidthMeters { get; private set; }
+    /// <summary>True heading of the landing direction.</summary>
+    public double LandingHeadingTrueDegrees { get; private set; }
     /// <summary>Displaced-threshold distance from the physical landing end.</summary>
     public double ThresholdOffsetMeters { get; private set; }
     public bool ThresholdOffsetKnown { get; private set; }
@@ -124,6 +126,7 @@ internal sealed class LandingDistanceAnalysis
             UsesFaa = RunwayMarkingConvention.UsesFaa(runway),
             RunwayLengthMeters = runway.LengthMeters,
             RunwayWidthMeters = runway.WidthMeters,
+            LandingHeadingTrueDegrees = landingHeading,
             ThresholdOffsetMeters = thresholdOffset ?? 0,
             ThresholdOffsetKnown = thresholdOffset.HasValue,
         };
@@ -173,6 +176,7 @@ internal sealed class LandingDistanceAnalysis
             UsesFaa = RunwayMarkingConvention.UsesFaa(runway),
             RunwayLengthMeters = runway.LengthMeters,
             RunwayWidthMeters = runway.WidthMeters,
+            LandingHeadingTrueDegrees = (runway.HeadingTrueDegrees + (secondary ? 180 : 0)) % 360,
             ThresholdOffsetMeters = thresholdOffset ?? 0,
             ThresholdOffsetKnown = thresholdOffset.HasValue,
             TouchdownMeters = touchdownMeters,

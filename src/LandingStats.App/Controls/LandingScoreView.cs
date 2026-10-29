@@ -20,9 +20,9 @@ public sealed class LandingScoreView : FrameworkElement
     private static readonly Brush TextBrush = Brush("#F5F3F0");
     private static readonly Brush AmberBrush = Brush("#D9C46A");
     private static readonly Brush TrackBrush = Brush("#1F1D1B");
-    // One color per grade, from Excellent to Bad, with a faint tint for badges.
-    private static readonly string[] GradeNames = { "Excellent", "Good", "Fair", "Poor", "Bad" };
-    private static readonly string[] GradeColors = { "7FD9A4", "B9D872", "E0C25E", "F09A5A", "FF7B6B" };
+    // One color per TouchdownFX grade, from Excellent to Dangerous, with a faint tint for badges.
+    private static readonly string[] GradeNames = { "Excellent", "Good", "Acceptable", "BelowAverage", "Poor", "Dangerous" };
+    private static readonly string[] GradeColors = { "7FD9A4", "B9D872", "E0C25E", "F09A5A", "FF7B6B", "D9569E" };
     private static readonly Brush[] GradeBrushes = GradeColors.Select(color => Brush("#" + color)).ToArray();
     private static readonly Brush[] GradeTints = GradeColors.Select(color => Brush("#26" + color)).ToArray();
     private static readonly Pen GridPen = Pen(GridBrush, 1);
@@ -50,8 +50,7 @@ public sealed class LandingScoreView : FrameworkElement
         {
             var prepared = ReplayPresentationData.Prepare(record, contacts ?? Array.Empty<LandingRecord>());
             _distance = LandingDistanceAnalysis.Create(record, prepared.Track, prepared.ContactTimes);
-            _score = LandingScore.Create(record, prepared.Track, _distance,
-                LandingReplayContacts.ForEpisode(record, contacts ?? Array.Empty<LandingRecord>()));
+            _score = LandingScore.Create(record, prepared.Track, _distance);
         }
         Invalidate();
     }
@@ -113,19 +112,15 @@ public sealed class LandingScoreView : FrameworkElement
         y += grade.Height + 12;
 
         var category = Text("Score.Category." + score.Category);
-        var basis = score.CategoryFromWeight
-            ? Format("Score.CategoryWeightFormat", category, record.WeightPounds * 0.45359237)
-            : Format("Score.CategorySpeedFormat", category, record.AirspeedKnots);
-        y = DrawWrapped(context, basis, MutedBrush, 11, y) + 6;
-        var available = score.Components.Count(component => component.Score.HasValue);
-        y = DrawWrapped(context, Format("Score.CriteriaFormat", available, score.Components.Count, score.AvailableWeight),
-            available == score.Components.Count ? MutedBrush : AmberBrush, 11, y) + 6;
-        if (score.BounceDeduction > 0)
-            y = DrawWrapped(context, Format("Score.BounceDeductedFormat", score.BounceCount, score.BounceDeduction), AmberBrush, 11, y) + 6;
-        if (score.Capped && score.LimitingScore is double limitingScore && score.Weakest is { } weakest)
-            y = DrawWrapped(context, Format("Score.CappedFormat",
-                Text("Score.Criterion." + (score.LimitedByBounce ? "Bounce" : weakest.Criterion.ToString())), limitingScore,
-                LandingScore.CapFor(limitingScore), score.UncappedTotal!.Value, LandingScore.CapBelowScore), AmberBrush, 11, y) + 6;
+        y = DrawWrapped(context, Format("Score.CategorySpeedFormat", category, record.AirspeedKnots), MutedBrush, 11, y) + 6;
+        var measured = score.Components.Count(component => component.Value.HasValue);
+        y = DrawWrapped(context, Format("Score.CriteriaFormat", measured, score.Components.Count),
+            measured == score.Components.Count ? MutedBrush : AmberBrush, 11, y) + 6;
+        foreach (var penalty in score.Penalties)
+            y = DrawWrapped(context, Format("Score.PenaltyFormat", Text("Score.Criterion." + penalty.Kind),
+                PenaltyReading(penalty.Kind, penalty.Value), PenaltyReading(penalty.Kind, penalty.Limit), penalty.Multiplier), AmberBrush, 11, y) + 6;
+        if (score.Penalties.Count > 0 && score.BaseScore is double baseScore)
+            y = DrawWrapped(context, Format("Score.PenaltyTotalFormat", baseScore, score.Multiplier, total), AmberBrush, 11, y) + 6;
         if (record.ContactCount > 1)
             y = DrawWrapped(context, Format("Score.ContactFormat", record.ContactCount), AmberBrush, 11, y) + 6;
         DrawWrapped(context, Text("Score.Basis"), SubtleBrush, 10, y + 6);
@@ -155,13 +150,6 @@ public sealed class LandingScoreView : FrameworkElement
                 ? Format("Score.PointsFormat", earned, component.Weight)
                 : Format("Score.PointsUnavailableFormat", component.Weight),
             Bar: true)).ToList();
-        // The bounce has no weight: it deducts from the total and takes part in the cap.
-        var curve = LandingScore.BounceScoreCurve;
-        rows.Add((Text("Score.Criterion.Bounce"),
-            Format("Score.Rule.BounceFormat", curve[0].Score, curve[1].Score, curve[1].X, curve[2].Score, curve[2].X),
-            score.BounceCount == 0 ? Text("Score.BounceNone") : Format("Score.BounceMeasuredFormat", string.Join(" / ",
-                score.BounceHeightsFeet.Select(height => height is double feet ? feet.ToString("0.0#", CultureInfo.CurrentCulture) : Text("Score.NotAvailable")))),
-            score.BounceScore, Format("Score.DeductionFormat", score.BounceDeduction), true));
 
         var rowHeight = Math.Max(40, Math.Min(66, (ActualHeight - HeaderHeight - 6) / rows.Count));
         for (var index = 0; index < rows.Count; index++)
@@ -220,25 +208,39 @@ public sealed class LandingScoreView : FrameworkElement
         magnitude.ToString("0.0", CultureInfo.CurrentCulture) + (unit == "°" ? unit : " " + unit) +
         (magnitude < tolerance ? string.Empty : " " + Text(signed > 0 ? "Replay.RightShort" : "Replay.LeftShort"));
 
+    private static string PenaltyReading(LandingScorePenaltyKind kind, double value) => kind switch
+    {
+        LandingScorePenaltyKind.Centerline => value.ToString("0.0", CultureInfo.CurrentCulture) + " " + Text("Replay.Meters"),
+        LandingScorePenaltyKind.GForce => value.ToString("0.00", CultureInfo.CurrentCulture) + " G",
+        LandingScorePenaltyKind.LateTouchdown => value.ToString("0", CultureInfo.CurrentCulture) + "%",
+        _ => value.ToString("0.0", CultureInfo.CurrentCulture) + "°",
+    };
+
     private string Rule(LandingScoreComponent component)
     {
-        var curve = component.Curve;
-        if (curve.Count == 0)
-            return Text(component.Criterion == LandingScoreCriterion.TouchdownZone || component.Criterion == LandingScoreCriterion.Centerline
-                ? "Score.NeedsRunway" : "Score.NotAvailable");
-        if (component.Score == null)
-            return Text(component.Criterion == LandingScoreCriterion.Crab ? "Score.NeedsTrack" :
+        if (component.Value == null)
+            return Text(component.Criterion is LandingScoreCriterion.TouchdownZone or LandingScoreCriterion.Centerline ? "Score.NeedsRunway" :
+                component.Criterion == LandingScoreCriterion.Crab ? "Score.NeedsTrack" :
                 component.Criterion == LandingScoreCriterion.GForce ? "Score.NeedsImpact" : "Score.NotAvailable");
-        return component.Criterion switch
+        var curve = component.Curve;
+        switch (component.Criterion)
         {
-            LandingScoreCriterion.VerticalSpeed => Format("Score.Rule.VerticalSpeedFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            LandingScoreCriterion.GForce => Format("Score.Rule.GForceFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            LandingScoreCriterion.TouchdownZone => Format("Score.Rule.TouchdownZoneFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            LandingScoreCriterion.Centerline => Format("Score.Rule.CenterlineFormat", curve[1].X, curve[2].X, curve[3].X),
-            LandingScoreCriterion.Crab => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            LandingScoreCriterion.Bank => Format("Score.Rule.AngleFormat", curve[1].X, curve[2].X, curve[3].X, curve[4].X),
-            _ => Format("Score.Rule.PitchFormat", curve[3].X, curve[4].X, curve[2].X, curve[5].X),
-        };
+            case LandingScoreCriterion.TouchdownZone:
+                var full = curve.Where(point => point.Score == 100).ToList();
+                return full.Count == 0 ? Text("Score.NotAvailable")
+                    : Format("Score.Rule.TouchdownZoneFormat", full[0].X, full[full.Count - 1].X, curve[curve.Count - 1].X);
+            case LandingScoreCriterion.Pitch:
+                return Format("Score.Rule.PitchFormat", curve[1].X, curve[2].X, curve[0].X, curve[3].X);
+            default:
+                var key = component.Criterion switch
+                {
+                    LandingScoreCriterion.VerticalSpeed => "Score.Rule.VerticalSpeedFormat",
+                    LandingScoreCriterion.GForce => "Score.Rule.GForceFormat",
+                    LandingScoreCriterion.Centerline => "Score.Rule.CenterlineFormat",
+                    _ => "Score.Rule.AngleFormat",
+                };
+                return Format(key, curve[1].X, curve[2].X);
+        }
     }
 
     internal static string Grade(double total) => GradeNames[GradeIndex(total)];
@@ -247,7 +249,8 @@ public sealed class LandingScoreView : FrameworkElement
 
     internal static Brush ScoreTintBrush(double score) => GradeTints[GradeIndex(score)];
 
-    private static int GradeIndex(double score) => score >= 90 ? 0 : score >= 80 ? 1 : score >= 65 ? 2 : score >= 50 ? 3 : 4;
+    private static int GradeIndex(double score) =>
+        score >= 90 ? 0 : score >= 75 ? 1 : score >= 60 ? 2 : score >= 40 ? 3 : score >= 20 ? 4 : 5;
 
     internal static Brush BounceBrush => AmberBrush;
 

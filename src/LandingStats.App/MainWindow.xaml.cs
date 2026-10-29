@@ -1593,7 +1593,7 @@ public partial class MainWindow : Window
             OverviewScoreGrade.Foreground = LandingScoreView.ScoreBrush(total);
             hint = LocalizationManager.Format("Score.OverviewFormat",
                 LocalizationManager.Text("Score.Category." + score.Category),
-                score.Components.Count(component => component.Score.HasValue), score.Components.Count) + "\n\n" + hint;
+                score.Components.Count(component => component.Value.HasValue), score.Components.Count) + "\n\n" + hint;
         }
         OverviewScoreHint.Text = hint;
         System.Windows.Automation.AutomationProperties.SetHelpText(OverviewScoreCell, hint);

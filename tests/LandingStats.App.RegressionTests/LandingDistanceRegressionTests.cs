@@ -98,7 +98,7 @@ internal static class LandingDistanceRegressionTests
     {
         Directory.CreateDirectory(outputDirectory);
         var records = LoadRecords(landingsDirectory);
-        var lines = new List<string> { "id,utc,airport,runway,contact,source,td_m,lateral_m,zone,aim_m,tch_ft,air_m,remaining_m,exit_remaining_m,threshold_known,end_s,end_m,end_gs_kt,category,score,vs,g,tdz,centerline,crab,bank,pitch,crab_deg,wind_kt,vs_v,g_v,tdz_v,centerline_v,crab_v,bank_v,pitch_v,bounces,bounce_ft,bounce_score,uncapped" };
+        var lines = new List<string> { "id,utc,airport,runway,contact,source,td_m,lateral_m,zone,aim_m,tch_ft,air_m,remaining_m,exit_remaining_m,threshold_known,end_s,end_m,end_gs_kt,category,score,vs,g,tdz,centerline,crab,bank,pitch,crab_deg,wind_kt,vs_v,g_v,tdz_v,centerline_v,crab_v,bank_v,pitch_v,base,multiplier,penalties" };
         var rendered = 0;
         foreach (var record in records.OrderByDescending(record => record.TimestampUtc))
         {
@@ -119,8 +119,8 @@ internal static class LandingDistanceRegressionTests
                 F(analysis.Samples[analysis.Samples.Count - 1].GroundSpeedKnots), score?.Category.ToString() ?? "bounce", F(score?.Total),
                 score == null ? blank : string.Join(",", score.Components.Select(component => F(component.Score))), F(score?.CrabSignedDegrees, "0.00"),
                 F(record.WindSpeedKnotsAtContact, "0.0"), score == null ? blank : string.Join(",", score.Components.Select(component => F(component.Value, "0.00"))),
-                score?.BounceCount.ToString(CultureInfo.InvariantCulture) ?? string.Empty, score == null ? string.Empty : string.Join(";", score.BounceHeightsFeet.Select(height => F(height, "0.00"))), F(score?.BounceScore),
-                F(score?.UncappedTotal)));
+                F(score?.BaseScore), F(score?.Multiplier, "0.000"),
+                score == null ? string.Empty : string.Join(";", score.Penalties.Select(penalty => penalty.Kind))));
             if (rendered++ < 12)
             {
                 view.SetHoverTime(-2);

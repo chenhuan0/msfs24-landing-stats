@@ -71,8 +71,8 @@ internal static class HistoryScoreRegressionTests
         }
         Check(LandingScore.ForFirstContact(second, new[] { bounced, second }) == null, "later contacts are not scored");
 
-        var grades = new[] { 95.0, 85, 70, 55, 40 }.Select(LandingScoreView.ScoreBrush).ToArray();
-        Check(grades.Distinct().Count() == 5, "each grade has its own color");
+        var grades = new[] { 95.0, 80, 65, 50, 30, 10 }.Select(LandingScoreView.ScoreBrush).ToArray();
+        Check(grades.Distinct().Count() == 6, "each grade has its own color");
 
         var store = new HistoryScoreStore();
         var converter = new HistoryScoreConverter();

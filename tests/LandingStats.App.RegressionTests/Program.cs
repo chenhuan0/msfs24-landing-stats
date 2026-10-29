@@ -254,7 +254,7 @@ internal static class Program
         Run("legacy Controls and 3D tabs follow recorded data and preserve selection", ReplayTabRegressionTests.RunAll);
         Run("3D replay pose, projection, gaps and legacy guards", LandingReplayRegressionTests.RunAll);
         Run("runway distance measures touchdown against threshold, aiming point and touchdown zone", LandingDistanceRegressionTests.RunAll);
-        Run("landing score weights seven criteria by category, rescales unavailable ones and deducts bounces", LandingScoreRegressionTests.RunAll);
+        Run("landing score follows the TouchdownFX scorecard: seven floored criteria times severity penalties", LandingScoreRegressionTests.RunAll);
         Run("landing score cache keeps totals per rules version and input stamp", HistoryScoreRegressionTests.Cache);
         Run("landing score badge matches the Score tab and colors each grade", HistoryScoreRegressionTests.Badge);
         Run("landing score history list scores in the background and reuses the cache", HistoryScoreRegressionTests.HistoryList);
