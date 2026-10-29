@@ -1406,6 +1406,11 @@
                                              Tag="ru" GroupName="ApplicationLanguage"
                                              Style="{StaticResource SettingsChoiceStyle}"
                                              Checked="OnLanguageSelectionChanged" />
+                                <RadioButton x:Name="SettingsLanguageChinese"
+                                             Content="{DynamicResource Settings.Chinese}"
+                                             Tag="zh" GroupName="ApplicationLanguage"
+                                             Style="{StaticResource SettingsChoiceStyle}"
+                                             Checked="OnLanguageSelectionChanged" />
                             </StackPanel>
                             <TextBlock x:Name="SettingsAutomaticLanguageText"
                                        Foreground="{StaticResource SubtleTextBrush}"

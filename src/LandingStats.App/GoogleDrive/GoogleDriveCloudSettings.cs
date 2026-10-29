@@ -25,7 +25,7 @@ internal sealed class GoogleDriveCloudSettings
             FormatVersion = CurrentFormatVersion;
         }
         var language = Language?.Trim().ToLowerInvariant();
-        Language = language == "en" || language == "ru" ? language : "auto";
+        Language = language == "en" || language == "ru" || language == "zh" ? language : "auto";
     }
 
     public bool IsSupported => FormatVersion <= CurrentFormatVersion;

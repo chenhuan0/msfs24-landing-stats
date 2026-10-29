@@ -23,6 +23,7 @@
     <system:String x:Key="History.ScoreToolTipFormat">Оценка посадки {1:0} / 100 · {0}</system:String>
     <system:String x:Key="History.ScoreUnavailable">Недостаточно данных для оценки посадки</system:String>
     <system:String x:Key="History.AverageRate">Средняя вертикальная скорость за месяц</system:String>
+    <system:String x:Key="History.TimestampFormat">dd MMM · HH:mm</system:String>
     <system:String x:Key="History.NoLandingsTitle">ПОСАДОК ПОКА НЕТ</system:String>
     <system:String x:Key="History.NoLandingsBody">Запустите MSFS и начните снижение ниже 500 футов AGL. После касания запись, анализ и сохранение выполнятся автоматически.</system:String>
     <system:String x:Key="History.NoMatchesTitle">НИЧЕГО НЕ НАЙДЕНО</system:String>
@@ -152,6 +153,7 @@
     <system:String x:Key="Settings.Automatic">АВТОМАТИЧЕСКИ</system:String>
     <system:String x:Key="Settings.English">ENGLISH</system:String>
     <system:String x:Key="Settings.Russian">РУССКИЙ</system:String>
+    <system:String x:Key="Settings.Chinese">简体中文</system:String>
     <system:String x:Key="Settings.AutomaticResolvedFormat">Сейчас автоматический режим выбирает: {0}.</system:String>
     <system:String x:Key="Settings.SaveErrorFormat">Не удалось сохранить настройки. {0}</system:String>
     <system:String x:Key="Settings.Applying">Применение настроек…</system:String>

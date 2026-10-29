@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using LandingStats.App.Presentation;
+using LandingStats.App.Settings;
 
 namespace LandingStats.App.Controls;
 
@@ -42,6 +43,8 @@ internal sealed class TouchdownCardWindow : Window
         ShowActivated = false;
         Focusable = false;
         IsHitTestVisible = false;
+        // Later language changes reach open windows through LocalizationManager.Apply.
+        Language = LocalizationManager.DisplayLanguage;
         _view.RenderTransform = _offset;
         Content = _view;
         _timer = new DispatcherTimer { Interval = DisplayDuration };

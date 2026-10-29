@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Windows;
+using System.Windows.Markup;
 
 namespace LandingStats.App.Settings;
 
@@ -13,6 +14,7 @@ internal static class LocalizationManager
     public const string AutomaticLanguage = "auto";
     public const string EnglishLanguage = "en";
     public const string RussianLanguage = "ru";
+    public const string ChineseLanguage = "zh";
 
     private static readonly CultureInfo DetectedSystemCulture = CultureInfo.CurrentCulture;
     private static readonly object DictionaryGate = new object();
@@ -24,10 +26,16 @@ internal static class LocalizationManager
 
     public static string EffectiveLanguage { get; private set; } = EnglishLanguage;
 
+    // WPF picks the fallback font for Chinese characters from the element language,
+    // not the thread culture; under its en-US default they render with Japanese
+    // glyphs. Other languages keep that default, which bindings also format with.
+    public static XmlLanguage DisplayLanguage => XmlLanguage.GetLanguage(
+        EffectiveLanguage == ChineseLanguage ? "zh-CN" : "en-US");
+
     public static string NormalizePreference(string? preference)
     {
         var normalized = preference?.Trim().ToLowerInvariant();
-        return normalized == EnglishLanguage || normalized == RussianLanguage
+        return normalized == EnglishLanguage || normalized == RussianLanguage || normalized == ChineseLanguage
             ? normalized
             : AutomaticLanguage;
     }
@@ -40,16 +48,37 @@ internal static class LocalizationManager
             return normalized;
         }
 
-        return string.Equals(systemCulture.TwoLetterISOLanguageName, RussianLanguage, StringComparison.OrdinalIgnoreCase)
-            ? RussianLanguage
-            : EnglishLanguage;
+        if (string.Equals(systemCulture.TwoLetterISOLanguageName, RussianLanguage, StringComparison.OrdinalIgnoreCase))
+        {
+            return RussianLanguage;
+        }
+
+        return IsSimplifiedChinese(systemCulture) ? ChineseLanguage : EnglishLanguage;
     }
 
     public static CultureInfo CultureFor(string effectiveLanguage)
     {
-        return string.Equals(effectiveLanguage, RussianLanguage, StringComparison.Ordinal)
-            ? CultureInfo.GetCultureInfo("ru-RU")
-            : CultureInfo.GetCultureInfo("en-GB");
+        return effectiveLanguage switch
+        {
+            RussianLanguage => CultureInfo.GetCultureInfo("ru-RU"),
+            ChineseLanguage => CultureInfo.GetCultureInfo("zh-CN"),
+            _ => CultureInfo.GetCultureInfo("en-GB"),
+        };
+    }
+
+    // Traditional Chinese locales (zh-TW, zh-HK, zh-MO) descend from zh-Hant and
+    // keep the English default; they can still choose Simplified Chinese explicitly.
+    private static bool IsSimplifiedChinese(CultureInfo culture)
+    {
+        for (var current = culture; !string.IsNullOrEmpty(current.Name); current = current.Parent)
+        {
+            if (string.Equals(current.Name, "zh-Hans", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static void Apply(string? preference)
@@ -65,9 +94,10 @@ internal static class LocalizationManager
         var dictionary = loaded.Dictionary;
         var strings = loaded.Strings;
 
-        var resources = Application.Current?.Resources;
-        if (resources != null)
+        var application = Application.Current;
+        if (application != null)
         {
+            var resources = application.Resources;
             if (_activeDictionary != null)
             {
                 resources.MergedDictionaries.Remove(_activeDictionary);
@@ -81,6 +111,15 @@ internal static class LocalizationManager
         Volatile.Write(ref _strings, strings);
         Models.ModelText.SetStrings(strings);
         EffectiveLanguage = effectiveLanguage;
+
+        // Tooltips and popups inherit the language from their placement target.
+        if (application != null)
+        {
+            foreach (Window window in application.Windows)
+            {
+                window.Language = DisplayLanguage;
+            }
+        }
     }
 
     public static string Text(string key)

@@ -873,6 +873,7 @@ public partial class MainWindow : Window
             SettingsLanguageAuto.IsChecked = normalized == LocalizationManager.AutomaticLanguage;
             SettingsLanguageEnglish.IsChecked = normalized == LocalizationManager.EnglishLanguage;
             SettingsLanguageRussian.IsChecked = normalized == LocalizationManager.RussianLanguage;
+            SettingsLanguageChinese.IsChecked = normalized == LocalizationManager.ChineseLanguage;
         }
         finally
         {
@@ -897,10 +898,12 @@ public partial class MainWindow : Window
     {
         var showLoading = _settingsLoadingIndicator.Update(
             !_isClosed && (!_startupReady || !_autoStartInitialized), null, RefreshSettingsPresentation);
-        var effectiveName = LocalizationManager.Text(
-            LocalizationManager.EffectiveLanguage == LocalizationManager.RussianLanguage
-                ? "Settings.Russian"
-                : "Settings.English");
+        var effectiveName = LocalizationManager.Text(LocalizationManager.EffectiveLanguage switch
+        {
+            LocalizationManager.RussianLanguage => "Settings.Russian",
+            LocalizationManager.ChineseLanguage => "Settings.Chinese",
+            _ => "Settings.English",
+        });
         SettingsAutomaticLanguageText.Text = LocalizationManager.Format(
             "Settings.AutomaticResolvedFormat",
             effectiveName);

@@ -19,7 +19,8 @@ public sealed class LandingPresentation
     public bool IsFirmLanding => Record.IsFirmLanding;
     private bool UsesLegacyImpact => Record.ImpactAnalysisVersion == 0;
 
-    public string TimestampDisplay => Record.TimestampUtc.ToLocalTime().ToString("dd MMM · HH:mm", CultureInfo.CurrentCulture);
+    public string TimestampDisplay => Record.TimestampUtc.ToLocalTime().ToString(
+        LocalizationManager.Text("History.TimestampFormat"), CultureInfo.CurrentCulture);
 
     public string LocationDisplay => Record.Runway == "—"
         ? Record.Airport

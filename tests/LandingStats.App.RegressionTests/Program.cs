@@ -348,8 +348,10 @@ internal static class Program
         Run("SDK rejection diagnostics bind packets, channels and optional capabilities per connection", BacklogDiagnosticRegressionTests.SdkPacketsHaveConnectionScopedOperationContext);
         Run("flight model resolver maps aircraft title and model", FlightModelResolverMapsAircraftIdentity);
         Run("flight model async failures fall back to telemetry", FlightModelAsyncFailuresFallBackToTelemetry);
-        Run("language auto-detection is Russian-only with an English fallback", LanguageAutoDetectionIsRussianOnly);
-        Run("English landing dates use an English month and 24-hour time", EnglishLandingDateFormatIsStable);
+        Run("language auto-detection picks Russian or Simplified Chinese with an English fallback", LanguageAutoDetectionMatchesSupportedLocales);
+        Run("landing dates use each language's month order and 24-hour time", LandingDateFormatsAreStable);
+        Run("every interface language has the same keys and format placeholders", LanguageDictionariesMatchEnglish);
+        Run("Chinese text uses Chinese font fallback in every window", ChineseLanguageReachesWindows);
         Run("settings preserve unknown future options", SettingsPreserveUnknownFutureOptions);
         Run("legacy settings leave simulator auto-start undecided", LegacySettingsLeaveAutoStartUndecided);
         Run("Google Drive onboarding follows simulator auto-start", GoogleDriveOnboardingFollowsAutoStart);
@@ -405,22 +407,86 @@ internal static class Program
         return _failures == 0 ? 0 : 1;
     }
 
-    private static void LanguageAutoDetectionIsRussianOnly()
+    private static void LanguageAutoDetectionMatchesSupportedLocales()
     {
         Equal("ru", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("ru-RU")), "Russian automatic language");
         Equal("en", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("en-US")), "English automatic language");
         Equal("en", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("de-DE")), "unsupported locale fallback");
         Equal("ru", LocalizationManager.ResolveLanguage("ru", CultureInfo.GetCultureInfo("de-DE")), "explicit Russian override");
         Equal("en", LocalizationManager.ResolveLanguage("en", CultureInfo.GetCultureInfo("ru-RU")), "explicit English override");
+        Equal("zh", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("zh-CN")), "mainland Chinese automatic language");
+        Equal("zh", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("zh-SG")), "Singapore Chinese automatic language");
+        Equal("en", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("zh-TW")), "Traditional Chinese keeps English");
+        Equal("en", LocalizationManager.ResolveLanguage("auto", CultureInfo.GetCultureInfo("zh-HK")), "Hong Kong Chinese keeps English");
+        Equal("zh", LocalizationManager.ResolveLanguage(" ZH ", CultureInfo.GetCultureInfo("en-US")), "explicit Chinese override");
+        var cloud = new GoogleDriveCloudSettings { Language = "zh" };
+        cloud.Normalize();
+        Equal("zh", cloud.Language, "cloud settings keep Chinese");
     }
 
-    private static void EnglishLandingDateFormatIsStable()
+    private static void LandingDateFormatsAreStable()
     {
         var value = new DateTime(2026, 8, 5, 21, 37, 0, DateTimeKind.Local);
-        Equal(
-            "05 Aug · 21:37",
-            value.ToString("dd MMM · HH:mm", LocalizationManager.CultureFor("en")),
-            "English landing timestamp");
+        foreach (var (language, expected) in new[] { ("en", "05 Aug · 21:37"), ("zh", "8月5日 · 21:37") })
+        {
+            LocalizationManager.Apply(language);
+            Equal(
+                expected,
+                value.ToString(LocalizationManager.Text("History.TimestampFormat"), LocalizationManager.CultureFor(language)),
+                language + " landing timestamp");
+        }
+    }
+
+    private static void LanguageDictionariesMatchEnglish()
+    {
+        var assembly = typeof(LocalizationManager).Assembly.GetName().Name;
+        Dictionary<string, string> Load(string language) => ((IDictionary)System.Windows.Application.LoadComponent(
+                new Uri($"/{assembly};component/Localization/Strings.{language}.xaml", UriKind.Relative)))
+            .Cast<DictionaryEntry>()
+            .ToDictionary(entry => (string)entry.Key, entry => (string)entry.Value, StringComparer.Ordinal);
+        static string Placeholders(string text) => string.Join(",", System.Text.RegularExpressions.Regex.Matches(text, @"\{(\d+)")
+            .Cast<System.Text.RegularExpressions.Match>().Select(match => match.Groups[1].Value).Distinct().OrderBy(index => index, StringComparer.Ordinal));
+        var english = Load("en");
+        var arguments = Enumerable.Repeat((object)0, 10).ToArray();
+        foreach (var language in new[] { "ru", "zh" })
+        {
+            var translated = Load(language);
+            var missing = english.Keys.Except(translated.Keys).OrderBy(key => key, StringComparer.Ordinal).ToList();
+            var extra = translated.Keys.Except(english.Keys).OrderBy(key => key, StringComparer.Ordinal).ToList();
+            Equal(string.Empty, string.Join(", ", missing), language + " missing keys");
+            Equal(string.Empty, string.Join(", ", extra), language + " extra keys");
+            foreach (var pair in english)
+            {
+                var text = translated[pair.Key];
+                Equal(Placeholders(pair.Value), Placeholders(text), $"{language} {pair.Key} placeholders");
+                Equal(pair.Value.StartsWith(" ", StringComparison.Ordinal), text.StartsWith(" ", StringComparison.Ordinal),
+                    $"{language} {pair.Key} leading space");
+                _ = string.Format(CultureInfo.InvariantCulture, text, arguments);
+            }
+        }
+    }
+
+    private static void ChineseLanguageReachesWindows()
+    {
+        var window = new System.Windows.Window();
+        TouchdownCardWindow? card = null;
+        try
+        {
+            LocalizationManager.Apply("zh");
+            Equal("zh-cn", window.Language.IetfLanguageTag.ToLowerInvariant(), "open window language");
+            card = new TouchdownCardWindow();
+            Equal("zh-cn", card.Language.IetfLanguageTag.ToLowerInvariant(), "touchdown card language");
+            Equal("8月5日 · 21:37", new DateTime(2026, 8, 5, 21, 37, 0).ToString(LocalizationManager.Text("History.TimestampFormat"), CultureInfo.CurrentCulture),
+                "Chinese thread culture");
+            LocalizationManager.Apply("ru");
+            Equal("en-us", window.Language.IetfLanguageTag.ToLowerInvariant(), "Russian keeps the WPF default language");
+            Equal("en-us", card.Language.IetfLanguageTag.ToLowerInvariant(), "Russian touchdown card language");
+        }
+        finally
+        {
+            card?.Close();
+            window.Close();
+        }
     }
 
     private static void SettingsPreserveUnknownFutureOptions()

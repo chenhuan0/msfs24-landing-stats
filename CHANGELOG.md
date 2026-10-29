@@ -9,6 +9,7 @@ All notable changes to MSFS Landing Stats are documented in this file.
 - Distance tab: touchdown position against the threshold, aiming point, target zone and touchdown zone, with a runway plan, approach profile, threshold crossing height and remaining runway.
 - Score tab: a 0–100 touchdown rating from vertical speed, peak G, touchdown zone, centerline, crab, bank and pitch, with thresholds based on published flight data monitoring event levels, touchdown limits and landing-gear sink-rate limits, showing each criterion's measurement, threshold and points. A bounced landing is scored on its first contact, with a deduction for each bounce by its height; later contacts are marked as bounces. The total also appears in the landing overview and, colored by grade, beside each landing in the history list.
 - Touchdown card: about a second after touchdown, a card over the simulator shows vertical speed, peak G, centerline offset and distance past the threshold for a few seconds, colored by score grade. It never takes focus from the simulator and can be previewed or turned off in Settings.
+- Simplified Chinese interface using standard civil aviation terminology, selectable in Settings and chosen automatically on Simplified Chinese Windows locales.
 
 ### Improved
 

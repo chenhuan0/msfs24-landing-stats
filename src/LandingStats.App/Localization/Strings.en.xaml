@@ -23,6 +23,7 @@
     <system:String x:Key="History.ScoreToolTipFormat">Landing score {1:0} / 100 · {0}</system:String>
     <system:String x:Key="History.ScoreUnavailable">Not enough data to score this landing</system:String>
     <system:String x:Key="History.AverageRate">Average vertical rate this month</system:String>
+    <system:String x:Key="History.TimestampFormat">dd MMM · HH:mm</system:String>
     <system:String x:Key="History.NoLandingsTitle">NO LANDING SESSIONS</system:String>
     <system:String x:Key="History.NoLandingsBody">Start MSFS and descend through 500 ft AGL. Recording, analysis and storage happen automatically after touchdown.</system:String>
     <system:String x:Key="History.NoMatchesTitle">NO MATCHING SESSIONS</system:String>
@@ -152,6 +153,7 @@
     <system:String x:Key="Settings.Automatic">AUTOMATIC</system:String>
     <system:String x:Key="Settings.English">ENGLISH</system:String>
     <system:String x:Key="Settings.Russian">РУССКИЙ</system:String>
+    <system:String x:Key="Settings.Chinese">简体中文</system:String>
     <system:String x:Key="Settings.AutomaticResolvedFormat">Automatic currently selects {0}.</system:String>
     <system:String x:Key="Settings.SaveErrorFormat">Could not save settings. {0}</system:String>
     <system:String x:Key="Settings.Applying">Applying settings…</system:String>
